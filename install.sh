@@ -362,13 +362,12 @@ install_go() {
     curl -sL "https://go.dev/dl/${GO_VERSION}.linux-amd64.tar.gz" -o go.tar.gz
 
     # Install
-    mkdir -p "$HOME/.local/go"
-    tar -C "$HOME/.local" -xzf go.tar.gz
+    tar -C "$LOCAL_SHARE_DIR" -xzf go.tar.gz
 
     # Add to PATH if not already there
-    if [[ ":$PATH:" != *":$HOME/.local/go/bin:"* ]]; then
-      echo 'export PATH="$HOME/.local/go/bin:$PATH"' >>"$HOME/.bashrc"
-      export PATH="$HOME/.local/go/bin:$PATH"
+    if [[ ":$PATH:" != *":$LOCAL_SHARE_DIR/go/bin:"* ]]; then
+      echo 'export PATH="$HOME/.local/share/go/bin:$PATH"' >>"$HOME/.bashrc"
+      export PATH="$LOCAL_SHARE_DIR/go/bin:$PATH"
     fi
 
     # Clean up
@@ -424,11 +423,11 @@ install_nushell() {
 
   # Download and extract
   curl -sL "https://github.com/nushell/nushell/releases/download/${NU_VERSION}/nu-${NU_VERSION}-x86_64-unknown-linux-musl.tar.gz" -o nu.tar.gz
-  tar -xzf nu.tar.gz -C $LOCAL_SHARE_DIR
+  tar -xzf nu.tar.gz -C $LOCAL_SHARE_DIR/
 
   # Install
-  chmod +x $LOCAL_SHARE_DIR/nu-${NU_VERSION}-x86_64-unknown-linux-musl
-  ln -sf  $LOCAL_SHARE_DIR/nu-${NU_VERSION}-x86_64-unknown-linux-musl/nu $LOCAL_BIN_DIR/
+  mv $LOCAL_SHARE_DIR/nu-${NU_VERSION}-x86_64-unknown-linux-musl $LOCAL_SHARE_DIR/nu
+  ln -sf  $LOCAL_SHARE_DIR/nu/nu $LOCAL_BIN_DIR/
 
   # Cleanup
   rm -rf "$TMP_DIR"
@@ -517,6 +516,9 @@ report() {
   check_version rustc "Rust"
   check_version nvim "Neovim"
   check_version node "Node.js"
+  check_version nu "Nushell"
+  echo -e "${GREEN}bat is installed: $(bat --version)${NC}"
+  echo -e "${GREEN}eza is installed: $(eza --version | tail -n2 | head -n1)${NC}"
   echo -e "${GREEN}Go is installed: $(go version)${NC}"
 
   echo -e "${BLUE}Installation report generated successfully${NC}"
