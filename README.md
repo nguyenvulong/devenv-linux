@@ -11,6 +11,9 @@ This script installs and configures:
 - **Development Tools**: Neovim (with LazyVim), Nushell
 - **Package Managers**: uv (Python)
 
+### Demo
+[![asciicast](https://asciinema.org/a/708631.svg)](https://asciinema.org/a/708631)
+
 ### Why `$HOME/.local/`?
 
 - No root privileges needed for updates
