@@ -125,25 +125,25 @@ install_utilities() {
       echo -e "${GREEN}fd is already installed in $LOCAL_BIN_DIR${NC}"
     fi
   fi
-    
+
   # Install tmux
   echo -e "${YELLOW}Installing tmux...${NC}"
   case $DISTRO_FAMILY in
-    debian)
-      sudo apt install -y tmux
-      ;;
-    arch)
-      sudo pacman -S --noconfirm tmux
-      ;;
-    redhat)
-      if command -v dnf > /dev/null; then
-        sudo dnf install -y tmux
-      else
-        sudo yum install -y tmux
-      fi
-      ;;
+  debian)
+    sudo apt install -y tmux
+    ;;
+  arch)
+    sudo pacman -S --noconfirm tmux
+    ;;
+  redhat)
+    if command -v dnf >/dev/null; then
+      sudo dnf install -y tmux
+    else
+      sudo yum install -y tmux
+    fi
+    ;;
   esac
-    
+
   # Install bat
   echo -e "${YELLOW}Installing bat...${NC}"
   if ! command -v bat &>/dev/null; then
@@ -157,7 +157,7 @@ install_utilities() {
       echo -e "${GREEN}bat is already installed in $LOCAL_BIN_DIR${NC}"
     fi
   fi
-    
+
   # Install eza (newer replacement for exa)
   echo -e "${YELLOW}Installing eza...${NC}"
   if ! command -v eza &>/dev/null; then
@@ -171,41 +171,16 @@ install_utilities() {
       echo -e "${GREEN}eza is already installed in $LOCAL_BIN_DIR${NC}"
     fi
   fi
-    
+
   # Configure tmux
-  if [ ! -f ~/.config/tmux/tmux.conf ]; then
-    mkdir -p ~/.config/tmux
-    cat > ~/.config/tmux/tmux.conf << 'EOL'
-# Set prefix to Ctrl-Space
-unbind C-b
-set -g prefix C-Space
-bind Space send-prefix
+  ## 1. Clone oh-my-tmux into XDG-compliant location
+  git clone --single-branch https://github.com/gpakosz/.tmux.git ~/.config/tmux
 
-# Set default terminal
-set -g default-terminal "tmux-256color"
-set -ga terminal-overrides ",*256col*:Tc"
+  ## 2. Symlink ~/.tmux.conf to the real file in ~/.config/tmux
+  ln -sf ~/.config/tmux/.tmux.conf ~/.tmux.conf
 
-# Start window numbering at 1
-set -g base-index 1
-
-# Enable mouse mode
-set -g mouse on
-
-# Increase scrollback buffer
-set -g history-limit 50000
-
-# Status bar
-set -g status-style bg=black,fg=white
-set -g window-status-current-style bg=white,fg=black,bold
-
-# Enable vim keys
-setw -g mode-keys vi
-EOL
-    # Link configuration file
-    if [ ! -f ~/.tmux.conf ]; then
-      ln -s ~/.config/tmux/tmux.conf ~/.tmux.conf
-    fi
-  fi
+  ## 3. Copy the user-editable local config without leading dot (more readable)
+  cp ~/.config/tmux/.tmux.conf.local ~/.config/tmux/tmux.conf.local
 
   echo -e "${GREEN}Utilities installed successfully${NC}"
 }
@@ -427,7 +402,7 @@ install_nushell() {
 
   # Install
   mv $LOCAL_SHARE_DIR/nu-${NU_VERSION}-x86_64-unknown-linux-musl $LOCAL_SHARE_DIR/nu
-  ln -sf  $LOCAL_SHARE_DIR/nu/nu $LOCAL_BIN_DIR/
+  ln -sf $LOCAL_SHARE_DIR/nu/nu $LOCAL_BIN_DIR/
 
   # Cleanup
   rm -rf "$TMP_DIR"
@@ -501,8 +476,9 @@ report() {
   check_version() {
     local cmd=$1
     local name=$2
+    local version
     if command -v "$cmd" &>/dev/null; then
-      local version=$("$cmd" --version 2>&1 | head -n 1)
+      version=$("$cmd" --version 2>&1 | head -n 1)
       echo -e "${GREEN}$name is installed: $version${NC}"
     else
       echo -e "${RED}$name is not installed${NC}"
