@@ -22,9 +22,9 @@ mkdir -p "$LOCAL_SHARE_DIR"
 # Add ~/.local/bin to PATH if not already there
 if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
   echo 'export PATH="$HOME/.local/bin:$PATH"' >>"$HOME/.bashrc"
-  export PATH="$HOME/.local/bin:$PATH"
   echo -e "${GREEN}Added ~/.local/bin to PATH${NC}"
 fi
+export PATH="$HOME/.local/bin:$PATH"
 
 # Detect Linux distribution
 detect_distro() {
@@ -173,6 +173,10 @@ install_utilities() {
   fi
 
   # Configure tmux
+  TMUX_DIR="$HOME/.config/tmux"
+  if [ -e "$TMUX_DIR" ]; then
+    mv $TMUX_DIR $TMUX_DIR"_bk"
+  fi
   ## 1. Clone oh-my-tmux into XDG-compliant location
   git clone --single-branch https://github.com/gpakosz/.tmux.git ~/.config/tmux
 
@@ -314,6 +318,17 @@ install_nodejs() {
     export NVM_DIR="$HOME/.nvm"
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
+  # Append NVM setup to .bashrc if not already present
+  NVM_LINE='export NVM_DIR="$HOME/.nvm"'
+  if ! grep -Fxq "$NVM_LINE" "$HOME/.bashrc"; then
+    {
+      echo ''
+      echo '# Load NVM'
+      echo 'export NVM_DIR="$HOME/.nvm"'
+      echo '[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"'
+    } >> "$HOME/.bashrc"
+  fi
+
     # Install latest LTS version
     nvm install --lts
 
@@ -411,12 +426,36 @@ install_nushell() {
   # Configure Nushell
   mkdir -p ~/.config/nushell
 
-  # Add Nushell to available shells if not already present
-  if ! grep -q "$LOCAL_BIN_DIR/nu" /etc/shells; then
-    echo "$LOCAL_BIN_DIR/nu" | sudo tee -a /etc/shells
-  fi
-
   echo -e "${GREEN}Nushell installed successfully${NC}"
+}
+
+
+install_fish() {
+  echo -e "${BLUE}Installing Fish Shell...${NC}"
+
+  # Fetch the latest Fish version
+  FISH_VERSION=$(curl -s https://api.github.com/repos/fish-shell/fish-shell/releases/latest | grep -Po '"tag_name": "\K[^"]*')
+
+  # Create temporary directory
+  TMP_DIR=$(mktemp -d)
+  cd "$TMP_DIR"
+
+  # Download and extract
+  curl -sL "https://github.com/fish-shell/fish-shell/releases/download/${FISH_VERSION}/fish-static-amd64-${FISH_VERSION}.tar.xz" -o fish.tar.xz
+  tar xf fish.tar.xz fish
+
+  # Install
+  chmod +x fish
+  mv fish "$LOCAL_BIN_DIR/"
+
+  # Cleanup
+  rm -rf "$TMP_DIR"
+  cd "$HOME"
+
+  # Configure Fish
+  mkdir -p ~/.config/fish
+
+  echo -e "${GREEN}Fish Shell installed successfully${NC}"
 }
 
 # Install bat from GitHub
@@ -493,6 +532,8 @@ report() {
   check_version nvim "Neovim"
   check_version node "Node.js"
   check_version nu "Nushell"
+  check_version fish "Fish"
+
   echo -e "${GREEN}bat is installed: $(bat --version)${NC}"
   echo -e "${GREEN}eza is installed: $(eza --version | tail -n2 | head -n1)${NC}"
   echo -e "${GREEN}Go is installed: $(go version)${NC}"
@@ -524,6 +565,7 @@ main() {
   install_neovim
   install_lazyvim
   install_nushell
+  install_fish
 
   # Generate installation report
   report
