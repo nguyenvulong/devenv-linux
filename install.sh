@@ -445,8 +445,7 @@ install_fish() {
   tar xf fish.tar.xz fish
 
   # Install
-  chmod +x fish
-  mv fish "$LOCAL_BIN_DIR/"
+  mv fish fish_indent fish_key_reader "$LOCAL_BIN_DIR/"
 
   # Cleanup
   rm -rf "$TMP_DIR"
