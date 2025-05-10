@@ -87,12 +87,11 @@ install_utilities() {
   # Install fzf
   echo -e "${YELLOW}Installing fzf...${NC}"
   if ! command -v fzf &>/dev/null; then
-    # Always install from GitHub to ensure it goes to LOCAL_BIN_DIR
-    install_fzf_from_github
+    install_fzf
   else
     # Check if fzf is in LOCAL_BIN_DIR
     if [[ "$(which fzf)" != "$LOCAL_BIN_DIR/fzf" ]]; then
-      install_fzf_from_github
+      install_fzf
     else
       echo -e "${GREEN}fzf is already installed in $LOCAL_BIN_DIR${NC}"
     fi
@@ -101,28 +100,52 @@ install_utilities() {
   # Install ripgrep
   echo -e "${YELLOW}Installing ripgrep...${NC}"
   if ! command -v rg &>/dev/null; then
-    # Always install from GitHub to ensure it goes to LOCAL_BIN_DIR
-    install_ripgrep_from_github
+    install_ripgrep
   else
     # Check if rg is in LOCAL_BIN_DIR
     if [[ "$(which rg)" != "$LOCAL_BIN_DIR/rg" ]]; then
-      install_ripgrep_from_github
+      install_ripgrep
     else
       echo -e "${GREEN}ripgrep is already installed in $LOCAL_BIN_DIR${NC}"
     fi
   fi
 
-  # Install fd-find
+  # Install fd (newer replacement for find)
   echo -e "${YELLOW}Installing fd-find...${NC}"
   if ! command -v fd &>/dev/null; then
-    # Always install from GitHub to ensure it goes to LOCAL_BIN_DIR
-    install_fd_from_github
+    install_fd
   else
     # Check if fd is in LOCAL_BIN_DIR
     if [[ "$(which fd)" != "$LOCAL_BIN_DIR/fd" ]]; then
-      install_fd_from_github
+      install_fd
     else
       echo -e "${GREEN}fd is already installed in $LOCAL_BIN_DIR${NC}"
+    fi
+  fi
+
+  # Install bat
+  echo -e "${YELLOW}Installing bat...${NC}"
+  if ! command -v bat &>/dev/null; then
+    install_bat
+  else
+    # Check if bat is in LOCAL_BIN_DIR
+    if [[ "$(which bat)" != "$LOCAL_BIN_DIR/bat" ]]; then
+      install_bat
+    else
+      echo -e "${GREEN}bat is already installed in $LOCAL_BIN_DIR${NC}"
+    fi
+  fi
+
+  # Install eza (newer replacement for exa)
+  echo -e "${YELLOW}Installing eza...${NC}"
+  if ! command -v eza &>/dev/null; then
+    install_eza
+  else
+    # Check if eza is in LOCAL_BIN_DIR
+    if [[ "$(which eza)" != "$LOCAL_BIN_DIR/eza" ]]; then
+      install_eza
+    else
+      echo -e "${GREEN}eza is already installed in $LOCAL_BIN_DIR${NC}"
     fi
   fi
 
@@ -144,34 +167,6 @@ install_utilities() {
     ;;
   esac
 
-  # Install bat
-  echo -e "${YELLOW}Installing bat...${NC}"
-  if ! command -v bat &>/dev/null; then
-    # Always install from GitHub to ensure it goes to LOCAL_BIN_DIR
-    install_bat_from_github
-  else
-    # Check if bat is in LOCAL_BIN_DIR
-    if [[ "$(which bat)" != "$LOCAL_BIN_DIR/bat" ]]; then
-      install_bat_from_github
-    else
-      echo -e "${GREEN}bat is already installed in $LOCAL_BIN_DIR${NC}"
-    fi
-  fi
-
-  # Install eza (newer replacement for exa)
-  echo -e "${YELLOW}Installing eza...${NC}"
-  if ! command -v eza &>/dev/null; then
-    # Always install from GitHub to ensure it goes to LOCAL_BIN_DIR
-    install_eza_from_github
-  else
-    # Check if eza is in LOCAL_BIN_DIR
-    if [[ "$(which eza)" != "$LOCAL_BIN_DIR/eza" ]]; then
-      install_eza_from_github
-    else
-      echo -e "${GREEN}eza is already installed in $LOCAL_BIN_DIR${NC}"
-    fi
-  fi
-
   # Configure tmux
   TMUX_DIR="$HOME/.config/tmux"
   if [ -e "$TMUX_DIR" ]; then
@@ -190,7 +185,7 @@ install_utilities() {
 }
 
 # Install fzf from GitHub
-install_fzf_from_github() {
+install_fzf() {
   echo -e "${YELLOW}Installing fzf from GitHub...${NC}"
   FZF_VERSION=$(curl -s https://api.github.com/repos/junegunn/fzf/releases/latest | grep -Po '"tag_name": "\K[^"]*')
 
@@ -214,7 +209,7 @@ install_fzf_from_github() {
 }
 
 # Install ripgrep from GitHub
-install_ripgrep_from_github() {
+install_ripgrep() {
   echo -e "${YELLOW}Installing ripgrep from GitHub...${NC}"
   RG_VERSION=$(curl -s https://api.github.com/repos/BurntSushi/ripgrep/releases/latest | grep -Po '"tag_name": "\K[^"]*')
 
@@ -239,7 +234,7 @@ install_ripgrep_from_github() {
 }
 
 # Install fd from GitHub
-install_fd_from_github() {
+install_fd() {
   echo -e "${YELLOW}Installing fd from GitHub...${NC}"
   FD_VERSION=$(curl -s https://api.github.com/repos/sharkdp/fd/releases/latest | grep -Po '"tag_name": "\K[^"]*')
 
@@ -263,6 +258,54 @@ install_fd_from_github() {
   echo -e "${GREEN}fd installed successfully${NC}"
 }
 
+# Install bat from Github
+install_bat() {
+  echo -e "${YELLOW}Installing bat from GitHub...${NC}"
+  BAT_VERSION=$(curl -s https://api.github.com/repos/sharkdp/bat/releases/latest | grep -Po '"tag_name": "\K[^"]*')
+
+  # Create temporary directory
+  TMP_DIR=$(mktemp -d)
+  cd "$TMP_DIR"
+
+  # Download and extract
+  curl -sL "https://github.com/sharkdp/bat/releases/download/${BAT_VERSION}/bat-${BAT_VERSION}-x86_64-unknown-linux-musl.tar.gz" -o bat.tar.gz
+  tar -xzf bat.tar.gz
+
+  # Install
+  mkdir -p "$LOCAL_SHARE_DIR/bat"
+  cp -r bat-*-x86_64-*/* "$LOCAL_SHARE_DIR/bat/"
+  ln -sf "$LOCAL_SHARE_DIR/bat/bat" "$LOCAL_BIN_DIR/bat"
+
+  # Clean up
+  cd "$HOME"
+  rm -rf "$TMP_DIR"
+
+  echo -e "${GREEN}bat installed successfully${NC}"
+}
+
+# Install eza from GitHub
+install_eza() {
+  echo -e "${YELLOW}Installing eza from GitHub...${NC}"
+  EZA_VERSION=$(curl -s https://api.github.com/repos/eza-community/eza/releases/latest | grep -Po '"tag_name": "\K[^"]*')
+
+  # Create temporary directory
+  TMP_DIR=$(mktemp -d)
+  cd "$TMP_DIR"
+
+  # Download and extract
+  curl -sL "https://github.com/eza-community/eza/releases/download/${EZA_VERSION}/eza_x86_64-unknown-linux-musl.tar.gz" -o eza.tar.gz
+  tar -xzf eza.tar.gz
+
+  # Install
+  chmod +x eza
+  mv eza "$LOCAL_BIN_DIR/"
+
+  # Clean up
+  cd "$HOME"
+  rm -rf "$TMP_DIR"
+
+  echo -e "${GREEN}eza installed successfully${NC}"
+}
 # Install Rust
 install_rust() {
   echo -e "${BLUE}Installing Rust...${NC}"
@@ -318,16 +361,16 @@ install_nodejs() {
     export NVM_DIR="$HOME/.nvm"
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
-  # Append NVM setup to .bashrc if not already present
-  NVM_LINE='export NVM_DIR="$HOME/.nvm"'
-  if ! grep -Fxq "$NVM_LINE" "$HOME/.bashrc"; then
-    {
-      echo ''
-      echo '# Load NVM'
-      echo 'export NVM_DIR="$HOME/.nvm"'
-      echo '[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"'
-    } >> "$HOME/.bashrc"
-  fi
+    # Append NVM setup to .bashrc if not already present
+    NVM_LINE='export NVM_DIR="$HOME/.nvm"'
+    if ! grep -Fxq "$NVM_LINE" "$HOME/.bashrc"; then
+      {
+        echo ''
+        echo '# Load NVM'
+        echo 'export NVM_DIR="$HOME/.nvm"'
+        echo '[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"'
+      } >>"$HOME/.bashrc"
+    fi
 
     # Install latest LTS version
     nvm install --lts
@@ -429,7 +472,6 @@ install_nushell() {
   echo -e "${GREEN}Nushell installed successfully${NC}"
 }
 
-
 install_fish() {
   echo -e "${BLUE}Installing Fish Shell...${NC}"
 
@@ -442,7 +484,7 @@ install_fish() {
 
   # Download and extract
   curl -sL "https://github.com/fish-shell/fish-shell/releases/download/${FISH_VERSION}/fish-static-amd64-${FISH_VERSION}.tar.xz" -o fish.tar.xz
-  tar xf fish.tar.xz fish
+  tar xf fish.tar.xz
 
   # Install
   mv fish fish_indent fish_key_reader "$LOCAL_BIN_DIR/"
@@ -453,57 +495,30 @@ install_fish() {
 
   # Configure Fish
   mkdir -p ~/.config/fish
+  cat >>~/.config/fish/config.fish <<'EOF'
+# colors
+export LS_COLORS="di=1;36:ln=35:so=32:pi=33:ex=31:bd=34;46:cd=34;43:su=30;41:sg=30;46:tw=30;42:ow=30;43"
+
+#
+set PATH $PATH /home/longnv/.local/bin
+
+# aliases
+alias ls='eza --icons=always'
+alias la='ls -a'
+alias ll='eza -lah'
+alias l='eza -lah --classify --grid'
+
+alias vim='v'
+alias v='nvim'
+alias vd='nvim -d'
+alias cat='BAT_THEME=Dracula bat --paging=never --plain'
+
+function history
+    builtin history --show-time="%Y-%m-%d %H:%M:%S " $argv
+end
+EOF
 
   echo -e "${GREEN}Fish Shell installed successfully${NC}"
-}
-
-# Install bat from GitHub
-install_bat_from_github() {
-  echo -e "${YELLOW}Installing bat from GitHub...${NC}"
-  BAT_VERSION=$(curl -s https://api.github.com/repos/sharkdp/bat/releases/latest | grep -Po '"tag_name": "\K[^"]*')
-
-  # Create temporary directory
-  TMP_DIR=$(mktemp -d)
-  cd "$TMP_DIR"
-
-  # Download and extract
-  curl -sL "https://github.com/sharkdp/bat/releases/download/${BAT_VERSION}/bat-${BAT_VERSION}-x86_64-unknown-linux-musl.tar.gz" -o bat.tar.gz
-  tar -xzf bat.tar.gz
-
-  # Install
-  mkdir -p "$LOCAL_SHARE_DIR/bat"
-  cp -r bat-*-x86_64-*/* "$LOCAL_SHARE_DIR/bat/"
-  ln -sf "$LOCAL_SHARE_DIR/bat/bat" "$LOCAL_BIN_DIR/bat"
-
-  # Clean up
-  cd "$HOME"
-  rm -rf "$TMP_DIR"
-
-  echo -e "${GREEN}bat installed successfully${NC}"
-}
-
-# Install eza from GitHub
-install_eza_from_github() {
-  echo -e "${YELLOW}Installing eza from GitHub...${NC}"
-  EZA_VERSION=$(curl -s https://api.github.com/repos/eza-community/eza/releases/latest | grep -Po '"tag_name": "\K[^"]*')
-
-  # Create temporary directory
-  TMP_DIR=$(mktemp -d)
-  cd "$TMP_DIR"
-
-  # Download and extract
-  curl -sL "https://github.com/eza-community/eza/releases/download/${EZA_VERSION}/eza_x86_64-unknown-linux-musl.tar.gz" -o eza.tar.gz
-  tar -xzf eza.tar.gz
-
-  # Install
-  chmod +x eza
-  mv eza "$LOCAL_BIN_DIR/"
-
-  # Clean up
-  cd "$HOME"
-  rm -rf "$TMP_DIR"
-
-  echo -e "${GREEN}eza installed successfully${NC}"
 }
 
 # Report installation results and versions
