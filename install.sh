@@ -441,6 +441,25 @@ install_lazyvim() {
   git clone https://github.com/LazyVim/starter ~/.config/nvim
   rm -rf ~/.config/nvim/.git
 
+  # Append the clipboard configuration to options.lua using a heredoc
+  cat >> "$CONFIG_DIR/nvim/lua/config/options.lua" << 'EOF'
+
+-- OSC 52 clipboard configuration
+vim.opt.clipboard = "unnamedplus"
+
+vim.g.clipboard = {
+  name = "OSC 52",
+  copy = {
+    ["+"] = require("vim.ui.clipboard.osc52").copy("+"),
+    ["*"] = require("vim.ui.clipboard.osc52").copy("*"),
+  },
+  paste = {
+    ["+"] = require("vim.ui.clipboard.osc52").paste("+"),
+    ["*"] = require("vim.ui.clipboard.osc52").paste("*"),
+  },
+}
+EOF
+
   echo -e "${GREEN}LazyVim has been installed. Start Neovim to complete the setup.${NC}"
 }
 
