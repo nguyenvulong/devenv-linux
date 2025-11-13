@@ -19,12 +19,17 @@ mkdir -p "$LOCAL_BIN_DIR"
 mkdir -p "$CONFIG_DIR"
 mkdir -p "$LOCAL_SHARE_DIR"
 
-# Add ~/.local/bin to PATH if not already there
-if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+# Add path to $HOME/.local/bin/
+if ! grep -q 'export PATH="$HOME/.local/bin:$PATH"' "$HOME/.bashrc"; then
   echo 'export PATH="$HOME/.local/bin:$PATH"' >>"$HOME/.bashrc"
   echo -e "${GREEN}Added ~/.local/bin to PATH${NC}"
 fi
-export PATH="$HOME/.local/bin:$PATH"
+
+case ":$PATH:" in
+*":$HOME/.local/bin:"*) ;;
+*) PATH="$HOME/.local/bin:$PATH" ;;
+esac
+export PATH
 
 # Detect Linux distribution
 detect_distro() {
@@ -442,7 +447,7 @@ install_lazyvim() {
   rm -rf ~/.config/nvim/.git
 
   # Append the clipboard configuration to options.lua using a heredoc
-  cat >> "$CONFIG_DIR/nvim/lua/config/options.lua" << 'EOF'
+  cat >>"$CONFIG_DIR/nvim/lua/config/options.lua" <<'EOF'
 
 -- OSC 52 clipboard configuration
 vim.opt.clipboard = "unnamedplus"
@@ -502,11 +507,14 @@ install_fish() {
   cd "$TMP_DIR"
 
   # Download and extract
-  curl -sL "https://github.com/fish-shell/fish-shell/releases/download/${FISH_VERSION}/fish-static-amd64-${FISH_VERSION}.tar.xz" -o fish.tar.xz
+  # fish releases changed the pattern, use a fixed version instead
+  # curl -sL "https://github.com/fish-shell/fish-shell/releases/download/${FISH_VERSION}/fish-static-amd64-${FISH_VERSION}.tar.xz" -o fish.tar.xz
+  curl -sL "https://github.com/fish-shell/fish-shell/releases/download/4.2.0/fish-4.2.0-linux-x86_64.tar.xz" -o fish.tar.xz
   tar xf fish.tar.xz
 
   # Install
-  mv fish fish_indent fish_key_reader "$LOCAL_BIN_DIR/"
+  # mv fish fish_indent fish_key_reader "$LOCAL_BIN_DIR/"
+  mv fish "$LOCAL_BIN_DIR/"
 
   # Cleanup
   rm -rf "$TMP_DIR"
