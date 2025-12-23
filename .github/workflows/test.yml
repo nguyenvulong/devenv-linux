@@ -2,9 +2,9 @@ name: Test Install Script
 
 on:
   push:
-    branches: [ fish, zsh ]
+    branches: [ dev ]
   pull_request:
-    branches: [ fish, zsh ]
+    branches: [ dev ]
   workflow_dispatch:
 
 jobs:
