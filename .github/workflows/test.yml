@@ -1,0 +1,192 @@
+name: Test Install Script
+
+on:
+  push:
+    branches: [ main, zsh ]
+  pull_request:
+    branches: [ main, zsh ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Test on ${{ matrix.distro }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: ubuntu-24.04
+            image: ubuntu:24.04
+            distro_name: "Ubuntu 24.04 LTS"
+          - distro: debian-13
+            image: debian:trixie
+            distro_name: "Debian 13 (trixie)"
+          - distro: fedora-43
+            image: fedora:43
+            distro_name: "Fedora 43"
+          - distro: arch
+            image: archlinux:latest
+            distro_name: "Arch Linux"
+    
+    container:
+      image: ${{ matrix.image }}
+      options: --privileged
+    
+    steps:
+      - name: Install prerequisites
+        run: |
+          if command -v apt-get &>/dev/null; then
+            apt-get update
+            apt-get install -y sudo git curl wget ca-certificates
+          elif command -v dnf &>/dev/null; then
+            dnf install -y sudo git curl wget ca-certificates findutils
+          elif command -v pacman &>/dev/null; then
+            pacman -Syu --noconfirm
+            pacman -S --noconfirm sudo git curl wget ca-certificates base-devel
+          fi
+
+      - name: Create test user
+        run: |
+          # Create a test user with sudo privileges
+          useradd -m -s /bin/bash testuser
+          echo "testuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+          
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run install script
+        run: |
+          # Change ownership to testuser
+          chown -R testuser:testuser .
+          
+          # Run the script as testuser
+          su - testuser -c "cd $(pwd) && bash install.sh"
+        shell: bash
+
+      - name: Verify installations
+        run: |
+          su - testuser -c '
+            # Source bashrc to get updated PATH
+            source ~/.bashrc
+            
+            echo "=== Checking installed tools ==="
+            
+            # Check utilities
+            echo "Checking fzf..."
+            fzf --version || exit 1
+            
+            echo "Checking ripgrep..."
+            rg --version || exit 1
+            
+            echo "Checking fd..."
+            fd --version || exit 1
+            
+            echo "Checking bat..."
+            bat --version || exit 1
+            
+            echo "Checking eza..."
+            eza --version || exit 1
+            
+            echo "Checking glow..."
+            glow --version || exit 1
+            
+            echo "Checking jaq..."
+            jaq --version || exit 1
+            
+            echo "Checking tmux..."
+            tmux -V || exit 1
+            
+            # Check programming languages
+            echo "Checking Rust..."
+            rustc --version || exit 1
+            cargo --version || exit 1
+            
+            echo "Checking Node.js..."
+            node --version || exit 1
+            npm --version || exit 1
+            
+            echo "Checking Go..."
+            go version || exit 1
+            
+            echo "Checking uv..."
+            uv --version || exit 1
+            
+            # Check development tools
+            echo "Checking Neovim..."
+            nvim --version || exit 1
+            
+            echo "Checking Nushell..."
+            nu --version || exit 1
+            
+            echo "Checking Fish..."
+            fish --version || exit 1
+            
+            echo "=== All tools verified successfully ==="
+          '
+        shell: bash
+
+      - name: Verify configurations
+        run: |
+          su - testuser -c '
+            echo "=== Checking configurations ==="
+            
+            # Check if PATH modifications are in bashrc
+            grep -q ".local/bin" ~/.bashrc || exit 1
+            
+            # Check if directories were created
+            [ -d ~/.config ] || exit 1
+            [ -d ~/.local/bin ] || exit 1
+            [ -d ~/.local/share ] || exit 1
+            
+            # Check specific config directories
+            [ -d ~/.config/nvim ] || exit 1
+            [ -d ~/.config/tmux ] || exit 1
+            [ -d ~/.config/nushell ] || exit 1
+            [ -d ~/.config/fish ] || exit 1
+            
+            # Check if tools are in the right location
+            [ -x ~/.local/bin/fzf ] || exit 1
+            [ -x ~/.local/bin/rg ] || exit 1
+            [ -x ~/.local/bin/fd ] || exit 1
+            [ -x ~/.local/bin/nvim ] || exit 1
+            
+            echo "=== All configurations verified successfully ==="
+          '
+        shell: bash
+
+      - name: Test basic functionality
+        run: |
+          su - testuser -c '
+            source ~/.bashrc
+            
+            echo "=== Testing basic functionality ==="
+            
+            # Test fzf
+            echo "test" | fzf -f "test" || exit 1
+            
+            # Test ripgrep
+            echo "test content" > /tmp/test.txt
+            rg "test" /tmp/test.txt || exit 1
+            
+            # Test fd
+            fd --version > /dev/null || exit 1
+            
+            # Test bat
+            bat --version > /dev/null || exit 1
+            
+            # Test eza
+            eza --version > /dev/null || exit 1
+            
+            # Test Node.js
+            node -e "console.log(\"Hello from Node.js\")" || exit 1
+            
+            # Test Rust
+            rustc --version > /dev/null || exit 1
+            
+            # Test Go
+            go version > /dev/null || exit 1
+            
+            echo "=== Basic functionality tests passed ==="
+          '
+        shell: bash
