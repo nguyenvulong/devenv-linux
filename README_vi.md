@@ -6,7 +6,7 @@ Một script đơn giản để thiết lập IDE trên Linux, cài đặt phiê
 
 Script này cài đặt và cấu hình các tools sau:
 
-- **Tiện Ích Shell**: fzf, ripgrep, fd, tmux, bat, eza
+- **Tiện Ích Shell**: fzf, ripgrep, fd, tmux, bat, eza, glow, jaq
 - **Ngôn Ngữ Lập Trình**: Rust, Node.js (qua nvm), Go
 - **Công Cụ Phát Triển**: Neovim (với LazyVim), Nushell
 - **Trình Quản Lý Gói**: uv (Python)

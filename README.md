@@ -6,7 +6,7 @@ A streamlined script to set up a modern development environment on Linux systems
 
 This script installs and configures:
 
-- **Shell Utilities**: fzf, ripgrep, fd, tmux, bat, eza
+- **Shell Utilities**: fzf, ripgrep, fd, tmux, bat, eza, glow, jaq
 - **Programming Languages**: Rust, Node.js (via nvm), Go
 - **Development Tools**: Neovim (with LazyVim), Nushell, Fish
 - **Package Managers**: uv (Python)
