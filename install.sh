@@ -20,8 +20,8 @@ mkdir -p "$CONFIG_DIR"
 mkdir -p "$LOCAL_SHARE_DIR"
 
 # Add path to $HOME/.local/bin/
-if ! grep -q 'export PATH="$HOME/.local/bin:$PATH"' "$HOME/.bashrc"; then
-  echo 'export PATH="$HOME/.local/bin:$PATH"' >>"$HOME/.bashrc"
+if ! grep -q "export PATH=\"\$HOME/.local/bin:\$PATH\"" "$HOME/.bashrc"; then
+  echo "export PATH=\"\$HOME/.local/bin:\$PATH\"" >>"$HOME/.bashrc"
   echo -e "${GREEN}Added ~/.local/bin to PATH${NC}"
 fi
 
@@ -34,6 +34,7 @@ export PATH
 # Detect Linux distribution
 detect_distro() {
   if [ -f /etc/os-release ]; then
+    # shellcheck source=/dev/null
     . /etc/os-release
     DISTRO_FAMILY=""
 
@@ -69,16 +70,20 @@ detect_distro() {
 install_base_dependencies() {
   echo -e "${BLUE}Installing base dependencies...${NC}"
 
+  # shellcheck disable=SC2086
   sudo $UPDATE_CMD
 
-  case $DISTRO_FAMILY in
+  case "$DISTRO_FAMILY" in
   debian)
+    # shellcheck disable=SC2086
     sudo $INSTALL_CMD build-essential curl wget git unzip tar
     ;;
   arch)
+    # shellcheck disable=SC2086
     sudo $INSTALL_CMD base-devel curl wget git unzip tar
     ;;
   redhat)
+    # shellcheck disable=SC2086
     sudo $INSTALL_CMD gcc gcc-c++ make curl wget git unzip tar
     ;;
   esac
@@ -175,7 +180,7 @@ install_utilities() {
   # Configure tmux
   TMUX_DIR="$HOME/.config/tmux"
   if [ -e "$TMUX_DIR" ]; then
-    mv $TMUX_DIR $TMUX_DIR"_bk"
+    mv "$TMUX_DIR" "$TMUX_DIR""_bk"
   fi
   ## 1. Clone oh-my-tmux into XDG-compliant location
   git clone --single-branch https://github.com/gpakosz/.tmux.git ~/.config/tmux
@@ -316,6 +321,7 @@ install_rust() {
   echo -e "${BLUE}Installing Rust...${NC}"
   if ! command -v rustc &>/dev/null; then
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    # shellcheck source=/dev/null
     source "$HOME/.cargo/env"
     echo -e "${GREEN}Rust installed successfully${NC}"
   else
@@ -364,15 +370,17 @@ install_nodejs() {
 
     # Source nvm
     export NVM_DIR="$HOME/.nvm"
+    # shellcheck source=/dev/null
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
     # Append NVM setup to .bashrc if not already present
-    NVM_LINE='export NVM_DIR="$HOME/.nvm"'
+    NVM_LINE="export NVM_DIR=\"\$HOME/.nvm\""
     if ! grep -Fxq "$NVM_LINE" "$HOME/.bashrc"; then
       {
         echo ''
         echo '# Load NVM'
-        echo 'export NVM_DIR="$HOME/.nvm"'
+        echo "export NVM_DIR=\"\$HOME/.nvm\""
+        # shellcheck disable=SC2016
         echo '[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"'
       } >>"$HOME/.bashrc"
     fi
@@ -404,7 +412,7 @@ install_go() {
 
     # Add to PATH if not already there
     if [[ ":$PATH:" != *":$LOCAL_SHARE_DIR/go/bin:"* ]]; then
-      echo 'export PATH="$HOME/.local/share/go/bin:$PATH"' >>"$HOME/.bashrc"
+      echo "export PATH=\"\$HOME/.local/share/go/bin:\$PATH\"" >>"$HOME/.bashrc"
       export PATH="$LOCAL_SHARE_DIR/go/bin:$PATH"
     fi
 
@@ -480,11 +488,11 @@ install_nushell() {
 
   # Download and extract
   curl -sL "https://github.com/nushell/nushell/releases/download/${NU_VERSION}/nu-${NU_VERSION}-x86_64-unknown-linux-musl.tar.gz" -o nu.tar.gz
-  tar -xzf nu.tar.gz -C $LOCAL_SHARE_DIR/
+  tar -xzf nu.tar.gz -C "$LOCAL_SHARE_DIR/"
 
   # Install
-  mv $LOCAL_SHARE_DIR/nu-${NU_VERSION}-x86_64-unknown-linux-musl $LOCAL_SHARE_DIR/nu
-  ln -sf $LOCAL_SHARE_DIR/nu/nu $LOCAL_BIN_DIR/
+  mv "$LOCAL_SHARE_DIR/nu-${NU_VERSION}-x86_64-unknown-linux-musl" "$LOCAL_SHARE_DIR/nu"
+  ln -sf "$LOCAL_SHARE_DIR/nu/nu" "$LOCAL_BIN_DIR/"
 
   # Cleanup
   rm -rf "$TMP_DIR"
@@ -500,7 +508,7 @@ install_fish() {
   echo -e "${BLUE}Installing Fish Shell...${NC}"
 
   # Fetch the latest Fish version
-  FISH_VERSION=$(curl -s https://api.github.com/repos/fish-shell/fish-shell/releases/latest | grep -Po '"tag_name": "\K[^"]*')
+  # FISH_VERSION=$(curl -s https://api.github.com/repos/fish-shell/fish-shell/releases/latest | grep -Po '"tag_name": "\K[^"]*')
 
   # Create temporary directory
   TMP_DIR=$(mktemp -d)
