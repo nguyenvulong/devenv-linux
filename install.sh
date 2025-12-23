@@ -31,6 +31,16 @@ case ":$PATH:" in
 esac
 export PATH
 
+# Helper function for GitHub API calls with authentication support
+github_api_curl() {
+  local url="$1"
+  if [ -n "$GITHUB_TOKEN" ]; then
+    curl -s -H "Authorization: token $GITHUB_TOKEN" "$url"
+  else
+    curl -s "$url"
+  fi
+}
+
 # Detect Linux distribution
 detect_distro() {
   if [ -f /etc/os-release ]; then
@@ -223,7 +233,7 @@ install_utilities() {
 # Install fzf from GitHub
 install_fzf() {
   echo -e "${YELLOW}Installing fzf from GitHub...${NC}"
-  FZF_VERSION=$(curl -s https://api.github.com/repos/junegunn/fzf/releases/latest | grep -Po '"tag_name": "\K[^"]*')
+  FZF_VERSION=$(github_api_curl https://api.github.com/repos/junegunn/fzf/releases/latest | grep -Po '"tag_name": "\K[^"]*')
 
   # Create temporary directory
   TMP_DIR=$(mktemp -d)
@@ -247,7 +257,7 @@ install_fzf() {
 # Install ripgrep from GitHub
 install_ripgrep() {
   echo -e "${YELLOW}Installing ripgrep from GitHub...${NC}"
-  RG_VERSION=$(curl -s https://api.github.com/repos/BurntSushi/ripgrep/releases/latest | grep -Po '"tag_name": "\K[^"]*')
+  RG_VERSION=$(github_api_curl https://api.github.com/repos/BurntSushi/ripgrep/releases/latest | grep -Po '"tag_name": "\K[^"]*')
 
   # Create temporary directory
   TMP_DIR=$(mktemp -d)
@@ -272,7 +282,7 @@ install_ripgrep() {
 # Install fd from GitHub
 install_fd() {
   echo -e "${YELLOW}Installing fd from GitHub...${NC}"
-  FD_VERSION=$(curl -s https://api.github.com/repos/sharkdp/fd/releases/latest | grep -Po '"tag_name": "\K[^"]*')
+  FD_VERSION=$(github_api_curl https://api.github.com/repos/sharkdp/fd/releases/latest | grep -Po '"tag_name": "\K[^"]*')
 
   # Create temporary directory
   TMP_DIR=$(mktemp -d)
@@ -297,7 +307,7 @@ install_fd() {
 # Install bat from Github
 install_bat() {
   echo -e "${YELLOW}Installing bat from GitHub...${NC}"
-  BAT_VERSION=$(curl -s https://api.github.com/repos/sharkdp/bat/releases/latest | grep -Po '"tag_name": "\K[^"]*')
+  BAT_VERSION=$(github_api_curl https://api.github.com/repos/sharkdp/bat/releases/latest | grep -Po '"tag_name": "\K[^"]*')
 
   # Create temporary directory
   TMP_DIR=$(mktemp -d)
@@ -322,7 +332,7 @@ install_bat() {
 # Install eza from GitHub
 install_eza() {
   echo -e "${YELLOW}Installing eza from GitHub...${NC}"
-  EZA_VERSION=$(curl -s https://api.github.com/repos/eza-community/eza/releases/latest | grep -Po '"tag_name": "\K[^"]*')
+  EZA_VERSION=$(github_api_curl https://api.github.com/repos/eza-community/eza/releases/latest | grep -Po '"tag_name": "\K[^"]*')
 
   # Create temporary directory
   TMP_DIR=$(mktemp -d)
@@ -406,7 +416,7 @@ install_rust() {
 install_neovim() {
   echo -e "${BLUE}Installing Neovim...${NC}"
   if ! command -v nvim &>/dev/null; then
-    NVIM_VERSION=$(curl -s https://api.github.com/repos/neovim/neovim/releases/latest | grep -Po '"tag_name": "\K[^"]*')
+    NVIM_VERSION=$(github_api_curl https://api.github.com/repos/neovim/neovim/releases/latest | grep -Po '"tag_name": "\K[^"]*')
 
     # Create temporary directory
     TMP_DIR=$(mktemp -d)
@@ -553,7 +563,7 @@ install_nushell() {
   echo -e "${BLUE}Installing Nushell...${NC}"
 
   # Fetch the latest Nushell version
-  NU_VERSION=$(curl -s https://api.github.com/repos/nushell/nushell/releases/latest | grep -Po '"tag_name": "\K[^"]*')
+  NU_VERSION=$(github_api_curl https://api.github.com/repos/nushell/nushell/releases/latest | grep -Po '"tag_name": "\K[^"]*')
 
   # Create temporary directory
   TMP_DIR=$(mktemp -d)
