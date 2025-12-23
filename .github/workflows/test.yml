@@ -51,18 +51,12 @@ jobs:
           # Create a test user with sudo privileges
           useradd -m -s /bin/bash testuser
           
+          # Set password for the user (required for PAM on Fedora)
+          echo "testuser:testpassword" | chpasswd
+          
           # Create sudoers file properly using /etc/sudoers.d/
           echo "testuser ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/testuser
           chmod 0440 /etc/sudoers.d/testuser
-          
-          # Fix PAM configuration for Fedora (and other Red Hat-based distros)
-          if command -v dnf &>/dev/null; then
-            # Ensure pam is properly configured
-            if [ -f /etc/pam.d/sudo ]; then
-              # Comment out pam_systemd requirement which can fail in containers
-              sed -i 's/^session.*pam_systemd/#&/' /etc/pam.d/sudo || true
-            fi
-          fi
           
       - name: Checkout code
         uses: actions/checkout@v4
@@ -81,8 +75,10 @@ jobs:
       - name: Verify installations
         run: |
           su - testuser -c '
-            # Source bashrc to get updated PATH
-            source ~/.bashrc
+            # Set PATH explicitly (bashrc is not sourced in non-interactive login shells)
+            export PATH="$HOME/.local/bin:$HOME/.local/share/go/bin:$HOME/.cargo/bin:$PATH"
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
             
             echo "=== Checking installed tools ==="
             
@@ -117,9 +113,6 @@ jobs:
             cargo --version || exit 1
             
             echo "Checking Node.js..."
-            # Explicitly source NVM for Node.js verification
-            export NVM_DIR="$HOME/.nvm"
-            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
             node --version || exit 1
             npm --version || exit 1
             
@@ -175,7 +168,10 @@ jobs:
       - name: Test basic functionality
         run: |
           su - testuser -c '
-            source ~/.bashrc
+            # Set PATH explicitly
+            export PATH="$HOME/.local/bin:$HOME/.local/share/go/bin:$HOME/.cargo/bin:$PATH"
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
             
             echo "=== Testing basic functionality ==="
             
@@ -195,9 +191,7 @@ jobs:
             # Test eza
             eza --version > /dev/null || exit 1
             
-            # Test Node.js (source NVM first)
-            export NVM_DIR="$HOME/.nvm"
-            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            # Test Node.js
             node -e "console.log(\"Hello from Node.js\")" || exit 1
             
             # Test Rust
