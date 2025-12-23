@@ -159,6 +159,32 @@ install_utilities() {
     fi
   fi
 
+  # Install glow
+  echo -e "${YELLOW}Installing glow...${NC}"
+  if ! command -v glow &>/dev/null; then
+    install_glow
+  else
+    # Check if glow is in LOCAL_BIN_DIR
+    if [[ "$(which glow)" != "$LOCAL_BIN_DIR/glow" ]]; then
+      install_glow
+    else
+      echo -e "${GREEN}glow is already installed in $LOCAL_BIN_DIR${NC}"
+    fi
+  fi
+
+  # Install jaq
+  echo -e "${YELLOW}Installing jaq...${NC}"
+  if ! command -v jaq &>/dev/null; then
+    install_jaq
+  else
+    # Check if jaq is in LOCAL_BIN_DIR
+    if [[ "$(which jaq)" != "$LOCAL_BIN_DIR/jaq" ]]; then
+      install_jaq
+    else
+      echo -e "${GREEN}jaq is already installed in $LOCAL_BIN_DIR${NC}"
+    fi
+  fi
+
   # Install tmux
   echo -e "${YELLOW}Installing tmux...${NC}"
   case $DISTRO_FAMILY in
@@ -316,6 +342,53 @@ install_eza() {
 
   echo -e "${GREEN}eza installed successfully${NC}"
 }
+
+# Install glow from GitHub
+install_glow() {
+  echo -e "${YELLOW}Installing glow from GitHub...${NC}"
+
+  # Create temporary directory
+  TMP_DIR=$(mktemp -d)
+  cd "$TMP_DIR"
+
+  # Download and extract (using fixed version)
+  curl -sL "https://github.com/charmbracelet/glow/releases/download/v2.1.1/glow_2.1.1_Linux_x86_64.tar.gz" -o glow.tar.gz
+  tar -xzf glow.tar.gz
+
+  # Install
+  cd glow_2.1.1_Linux_x86_64/
+  chmod +x glow
+  mv glow "$LOCAL_BIN_DIR/"
+
+  # Clean up
+  cd "$HOME"
+  rm -rf "$TMP_DIR"
+
+  echo -e "${GREEN}glow installed successfully${NC}"
+}
+
+# Install jaq from GitHub
+install_jaq() {
+  echo -e "${YELLOW}Installing jaq from GitHub...${NC}"
+
+  # Create temporary directory
+  TMP_DIR=$(mktemp -d)
+  cd "$TMP_DIR"
+
+  # Download directly (latest release)
+  curl -fsSL "https://github.com/01mf02/jaq/releases/latest/download/jaq-$(uname -m)-unknown-linux-musl" -o jaq
+
+  # Install
+  chmod +x jaq
+  mv jaq "$LOCAL_BIN_DIR/"
+
+  # Clean up
+  cd "$HOME"
+  rm -rf "$TMP_DIR"
+
+  echo -e "${GREEN}jaq installed successfully${NC}"
+}
+
 # Install Rust
 install_rust() {
   echo -e "${BLUE}Installing Rust...${NC}"
