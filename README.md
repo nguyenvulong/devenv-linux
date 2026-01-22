@@ -12,6 +12,7 @@ This script installs and configures:
 - **Package Managers**: uv (Python)
 
 ### Demo
+
 [![asciicast](https://asciinema.org/a/708631.svg)](https://asciinema.org/a/708631)
 
 ### Why `$HOME/.local/`?
@@ -23,21 +24,27 @@ This script installs and configures:
 
 ## Usage
 
-#### Clone the repository:
+#### Clone the repository
+
 ```bash
 git clone https://github.com/nguyenvulong/devenv-linux.git
 ```
+
 #### Run the installation
+
 ```bash
 cd devenv-linux
 chmod +x install.sh
 ./install.sh
 ```
+
 #### After installation
+
 ```
 source $HOME/.bashrc
 nvim # Wait for plugin installation to complete
 ```
+
 To exit Neovim: press `<space> q q`
 
 For convenience, you can add some aliases, here are mine
@@ -58,9 +65,10 @@ alias tree="eza --tree"
 And `source $HOME/.bashrc` again.
 
 ##### Fish
+
 ```bash
 #
-set PATH $PATH /home/longnv/.local/bin
+set PATH $PATH ~/.local/bin
 
 # aliases
 alias ls='eza --icons=always'
@@ -81,15 +89,18 @@ end
 And `source ~/.config/fish/config.fish`.
 
 ## Notes
+
 - Tested on: Debian, Ubuntu, Fedora, CentOS Stream, and Arch Linux
 - Must be run from `bash` shell
-- Need `sudo` privileges to install `build essentials`, `tmux`, and `nushell` 
+- Need `sudo` privileges to install `build essentials`, `tmux`, and `nushell`
 - Can be overwhelming for new users
-- Some tools can be redundant 
+- Some tools can be redundant
 
 ## Future plan
+
 - More distros
 - Dockerization
 
 ## License
+
 MIT
