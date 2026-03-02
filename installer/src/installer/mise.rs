@@ -21,41 +21,58 @@ where
     }
 }
 
+/// Resolve the path to the mise binary.
+/// mise installs itself to ~/.local/bin/mise, which may not be on PATH yet.
+fn mise_bin() -> String {
+    if crate::sys::check_command_exists("mise") {
+        return "mise".to_string();
+    }
+    let home = std::env::var("HOME").unwrap_or_default();
+    let home_mise = format!("{}/.local/bin/mise", home);
+    if fs::metadata(&home_mise).is_ok() {
+        return home_mise;
+    }
+    "mise".to_string() // last resort — will fail with a clear error
+}
+
 pub fn activate_mise_tools<F>(components: &[&Component], mut log: F) -> Result<(), String>
 where
     F: FnMut(&str) + Send + 'static + Clone,
 {
-    let mut args = vec!["use".to_string(), "-g".to_string()];
-    
-    for c in components {
-        if let Category::Mise(ref plugin) = c.category {
-            args.push(format!("{}@latest", plugin));
-        }
-    }
-
-    if args.len() <= 2 {
+    if components.is_empty() {
         log("No mise components to install.");
         return Ok(());
     }
 
-    let joined_args = args.join(" ");
-    log(&format!("Running: mise {}", joined_args));
+    let mise = mise_bin();
 
-    // We must ensure ~/.local/bin/mise exists or we just use `mise` if it's on PATH
-    let mut mise_path = "mise".to_string();
-    if !crate::sys::check_command_exists("mise") {
-        let home_mise = format!("{}/.local/bin/mise", std::env::var("HOME").unwrap_or_default());
-        if fs::metadata(&home_mise).is_ok() {
-            mise_path = home_mise;
+    // Install each tool individually so a single unknown-registry name
+    // does not abort the entire installation batch.
+    let mut any_error = false;
+    for c in components {
+        if let Category::Mise(ref plugin) = c.category {
+            let tool_spec = format!("{}@latest", plugin);
+            log(&format!("Installing: mise use -g {}", tool_spec));
+
+            let result = run_cmd_streaming(
+                &mise,
+                &["use", "-g", &tool_spec],
+                log.clone(),
+            );
+
+            if !result.success {
+                log(&format!("[WARN] Failed to install {}: {}", plugin, result.stderr.trim()));
+                any_error = true;
+                // Continue — don't abort the loop for one bad tool.
+            }
         }
     }
 
-    let args_ref: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
-    let result = run_cmd_streaming(&mise_path, &args_ref, log);
-    
-    if result.success {
-        Ok(())
-    } else {
-        Err(format!("Failed to install mise tools: {}", result.stderr))
+    if any_error {
+        // Return Ok so the caller doesn't treat this as a fatal error;
+        // individual [WARN] lines already surfaced the details.
+        log("[WARN] Some mise tools failed to install (see above).");
     }
+
+    Ok(())
 }

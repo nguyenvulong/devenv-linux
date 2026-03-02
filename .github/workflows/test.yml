@@ -63,8 +63,6 @@ jobs:
 
       - name: Run installer (as user)
         if: ${{ !matrix.run_as_root }}
-        env:
-          CI: "true"
         run: |
           chown -R testuser:testuser .
           su - testuser -c "cd $(pwd) && bash install.sh --all"
@@ -72,20 +70,21 @@ jobs:
 
       - name: Run installer (as root)
         if: ${{ matrix.run_as_root }}
-        env:
-          CI: "true"
         run: bash install.sh --all
         shell: bash
 
-      # ── Verify tools (mise shim paths) ────────────────────────────────────
-      # mise installs shims to ~/.local/share/mise/shims/.
-      # We add that (and ~/.cargo/bin for rustup-installed cargo) to PATH.
+      # ── Verify tools ──────────────────────────────────────────────────────
+      # mise binary:  ~/.local/bin/mise
+      # mise shims:   ~/.local/share/mise/shims/
+      # cargo:        ~/.cargo/bin/
+      # set -e ensures any missing tool fails the step immediately.
 
       - name: Verify tool installations (as user)
         if: ${{ !matrix.run_as_root }}
         run: |
           su - testuser -c '
-            export PATH="$HOME/.local/share/mise/shims:$HOME/.cargo/bin:$PATH"
+            set -e
+            export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$HOME/.cargo/bin:$PATH"
             echo "=== Checking installed tools ==="
             mise --version
             fzf --version
@@ -110,7 +109,8 @@ jobs:
       - name: Verify tool installations (as root)
         if: ${{ matrix.run_as_root }}
         run: |
-          export PATH="$HOME/.local/share/mise/shims:$HOME/.cargo/bin:$PATH"
+          set -e
+          export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$HOME/.cargo/bin:$PATH"
           echo "=== Checking installed tools ==="
           mise --version
           fzf --version
@@ -137,6 +137,7 @@ jobs:
         if: ${{ !matrix.run_as_root }}
         run: |
           su - testuser -c '
+            set -e
             [ -d ~/.config/nvim ]  || { echo "Missing nvim config";  exit 1; }
             [ -d ~/.config/tmux ]  || { echo "Missing tmux config";  exit 1; }
             [ -d ~/.config/fish ]  || { echo "Missing fish config";  exit 1; }
@@ -147,6 +148,7 @@ jobs:
       - name: Verify configurations (as root)
         if: ${{ matrix.run_as_root }}
         run: |
+          set -e
           [ -d ~/.config/nvim ]  || { echo "Missing nvim config";  exit 1; }
           [ -d ~/.config/tmux ]  || { echo "Missing tmux config";  exit 1; }
           [ -d ~/.config/fish ]  || { echo "Missing fish config";  exit 1; }
@@ -159,7 +161,8 @@ jobs:
         if: ${{ !matrix.run_as_root }}
         run: |
           su - testuser -c '
-            export PATH="$HOME/.local/share/mise/shims:$HOME/.cargo/bin:$PATH"
+            set -e
+            export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$HOME/.cargo/bin:$PATH"
             echo "test" | fzf -f "test"
             echo "test content" > /tmp/test.txt && rg "test" /tmp/test.txt
             node -e "console.log(\"Hello from Node.js\")"
@@ -172,7 +175,8 @@ jobs:
       - name: Smoke test (as root)
         if: ${{ matrix.run_as_root }}
         run: |
-          export PATH="$HOME/.local/share/mise/shims:$HOME/.cargo/bin:$PATH"
+          set -e
+          export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$HOME/.cargo/bin:$PATH"
           echo "test" | fzf -f "test"
           echo "test content" > /tmp/test.txt && rg "test" /tmp/test.txt
           node -e "console.log(\"Hello from Node.js\")"
