@@ -41,7 +41,7 @@ jobs:
             apt-get update
             apt-get install -y sudo git curl wget ca-certificates build-essential
           elif command -v dnf &>/dev/null; then
-            dnf install -y git curl wget ca-certificates findutils gcc gcc-c++ make
+            dnf install -y git curl wget ca-certificates findutils gcc gcc-c++ make libatomic
           elif command -v pacman &>/dev/null; then
             pacman -Syu --noconfirm
             pacman -S --noconfirm sudo git curl wget ca-certificates base-devel
