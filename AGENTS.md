@@ -31,7 +31,7 @@ devenv-linux/
     ├── Cargo.toml
     ├── Cargo.lock
     └── src/
-        ├── main.rs          # Entry point, event loop, sudo pre-auth, install thread
+        ├── main.rs          # Entry point: headless mode (--all/CI=true), event loop, sudo pre-auth, install thread
         ├── app.rs           # App state (component list, cursor, screen, Arc log/done/index)
         ├── ui.rs            # Ratatui rendering (3 screens: Selection, Installing, Report)
         ├── registry.rs      # Static list of all installable components + detection logic
@@ -40,7 +40,7 @@ devenv-linux/
             ├── mod.rs       # pub mod declarations
             ├── mise.rs      # Mise self-install + `mise use -g <tools>` orchestration
             ├── system.rs    # Sudo package installs (apt/pacman/dnf) — base-deps + tmux
-            └── config.rs    # Dotfile setup: fish config, oh-my-tmux, LazyVim + OSC52
+            └── config.rs    # Dotfile setup: fish config, nushell env.nu, oh-my-tmux, LazyVim + OSC52
 ```
 
 ---
@@ -53,9 +53,14 @@ devenv-linux/
    - Installs minimal system deps (curl, git, gcc) if missing
    - Installs `rustup` if `cargo` is not available
    - Runs `cargo build --release` inside `installer/`
-   - Executes `./installer/target/release/installer`
+   - Executes `./installer/target/release/installer "$@"` (forwarding any flags, e.g. `--all`)
 
-2. **Pre-TUI phase (`main.rs`)**
+2. **Headless / non-interactive mode (`main.rs:run_headless`)**
+   - Activated by `--all` CLI flag, `CI=true`, or `INSTALLER_ALL=1` env var
+   - Skips the TUI entirely — force-selects every component, runs all three phases, prints to stdout
+   - Safe to run in CI containers with no TTY
+
+3. **Pre-TUI phase (`main.rs`)**
    - Detects if any `SystemPackage` components are selected
    - If so, runs **`sudo -v` in normal terminal mode** (before `enable_raw_mode`) so the password prompt is visible
    - Spawns a background thread that re-runs `sudo -v` every 50 s to keep credentials cached throughout long installs
@@ -77,7 +82,7 @@ devenv-linux/
    |-------|-------|---------|--------------|
    | System Packages | 0 | `installer::system` | `sudo apt/pacman/dnf install` base-deps + tmux |
    | Mise Tools | 1 | `installer::mise` | Self-installs `mise`, then `mise use -g <tools>@latest` |
-   | Configurations | 2 | `installer::config` | Fish config, oh-my-tmux clone, LazyVim clone + OSC52 |
+   | Configurations | 2 | `installer::config` | Fish config, Nushell `env.nu`, oh-my-tmux, LazyVim + OSC52 |
 
 ### Tool Categories (`registry.rs`)
 
@@ -85,7 +90,7 @@ devenv-linux/
 |----------|-------|---------|
 | `Mise(String)` | zero-sudo, version-managed | rust, node, go, uv, neovim, fish, nu, fzf, rg, fd, bat, eza, glow, jaq |
 | `SystemPackage` | requires sudo | base-deps (build-essential etc.), tmux |
-| `Config` | bash git/file ops | fish config, oh-my-tmux, LazyVim + OSC52 |
+| `Config` | bash git/file ops | fish config (with mise shims PATH), nushell `env.nu` (mise shims PATH), oh-my-tmux, LazyVim + OSC52 |
 
 All tools that previously used hand-rolled GitHub release downloads have been replaced with `mise`. No direct download code exists anymore.
 
@@ -104,11 +109,7 @@ All tools that previously used hand-rolled GitHub release downloads have been re
 > Update this section as work progresses.
 
 - [ ] **Version detection** — the initial scan only checks if a binary exists, not its version. Wire up `get_installed_version()` in `sys.rs` to populate `InstallStatus::Installed(version_string)` properly and show `UpdateAvailable` when mise has a newer release.
-- [ ] **CI workflow update** — `test.yml` expects `~/.local/bin/fzf` etc. (old direct-download paths). These paths need updating to `mise` shim paths (`~/.local/share/mise/shims/`) or by sourcing `mise activate` before verification.
-- [ ] **Non-interactive / headless mode** — the TUI requires a TTY. Add a `--non-interactive` or `--all` flag that skips the TUI and installs everything for CI/scripted use.
 - [ ] **`ureq` / `semver` crates unused** — they were planned for version comparison via GitHub API but not yet implemented. Either implement version checking or remove from `Cargo.toml`.
-- [ ] **Fish & Nushell PATH** — mise shims must be on PATH for fish/nu configs to reference them correctly. Ensure `~/.local/share/mise/shims` is appended in the fish config written by `config.rs`.
-
 ---
 
 ## CI / Testing
@@ -124,7 +125,7 @@ Runs on push/PR to `dev` branch. Tests across 4 containers:
 | fedora-43 | `fedora:43` | root |
 | arch | `archlinux:latest` | non-root |
 
-> **Note:** CI currently tests the old `install.sh` flow. It needs updating to handle the Ratatui TUI non-interactively (see "Non-interactive mode" task above).
+> CI calls `bash install.sh` with `CI=true`, which triggers headless mode in the installer binary. Tool verification uses `~/.local/share/mise/shims` paths.
 
 ---
 
@@ -164,3 +165,8 @@ Commits should follow Conventional Commits format: `feat:`, `fix:`, `chore:`, `d
 | 2026-03-02 | Replace monolithic `install.sh` (712 lines) with Ratatui TUI installer (`installer/`) |
 | 2026-03-02 | Move all tool installs to `mise`; eliminate all direct GitHub release downloads |
 | 2026-03-02 | Fix sudo TTY issue: pre-authenticate before TUI, run installation on background thread |
+| 2026-03-03 | Add headless/non-interactive mode: `--all` flag, `CI=true`, `INSTALLER_ALL=1` |
+| 2026-03-03 | Fix `install.sh` to forward `"$@"` to the installer binary |
+| 2026-03-03 | Update CI workflow (`test.yml`) for Ratatui installer + mise shim paths |
+| 2026-03-03 | Add `config-nushell`: writes mise shims PATH to `~/.config/nushell/env.nu` |
+| 2026-03-03 | Rewrite `README.md` and `README_vi.md` for novice quick-start |

@@ -1,56 +1,63 @@
 # Thiết Lập Môi Trường Phát Triển Linux
 
-Một script đơn giản để thiết lập IDE trên Linux, cài đặt phiên bản mới nhất của các tools phổ biến từ GitHub vào `$HOME/.local/`.
+Trình cài đặt TUI tương tác giúp thiết lập môi trường phát triển trên Linux.  
+Viết bằng Rust + [Ratatui](https://github.com/ratatui/ratatui). Quản lý công cụ bằng [mise](https://mise.jdx.dev).
 
-## Tổng Quan
+## Những Gì Được Cài Đặt
 
-Script này cài đặt và cấu hình các tools sau:
+| Nhóm | Công cụ |
+|---|---|
+| Tiện ích shell | fzf, ripgrep, fd, bat, eza, glow, jaq |
+| Terminal | tmux (+ oh-my-tmux) |
+| Ngôn ngữ | Rust, Node.js, Go, Python (uv) |
+| Trình soạn thảo | Neovim (LazyVim) |
+| Shell | Fish, Nushell |
 
-- **Tiện Ích Shell**: fzf, ripgrep, fd, tmux, bat, eza, glow, jaq
-- **Ngôn Ngữ Lập Trình**: Rust, Node.js (qua nvm), Go
-- **Công Cụ Phát Triển**: Neovim (với LazyVim), Nushell
-- **Trình Quản Lý Gói**: uv (Python)
+## Bắt Đầu Nhanh
 
-### Demo
-[![asciicast](https://asciinema.org/a/708631.svg)](https://asciinema.org/a/708631)
-
-### Tại sao mình chọn `$HOME/.local/`?
-
-- Không cần quyền `sudo` để cập nhật
-- Luôn nhận được các bản phát hành mới nhất từ GitHub
-- Tránh xung đột với trình quản lý gói của hệ thống
-- Đồng bộ trên các bản phân phối Linux khác nhau
-
-## Sử Dụng
-
-#### Clone từ Github
 ```bash
 git clone https://github.com/nguyenvulong/devenv-linux.git
-```
-#### Chạy cài đặt
-```bash
 cd devenv-linux
-chmod +x install.sh
-./install.sh
+bash install.sh
 ```
-#### Sau khi cài đặt
+
+`install.sh` sẽ:
+1. Cài build essentials & Rust (nếu chưa có)
+2. Biên dịch trình cài đặt TUI
+3. Mở menu tương tác — chọn công cụ bạn muốn rồi nhấn **Enter**
+
+> **Yêu cầu:** `bash`, `curl`, `git` và quyền `sudo` (để cài system packages & tmux).
+
+## Sau Khi Cài Đặt
+
+Tải lại shell:
+
+```bash
+source ~/.bashrc                       # bash
+source ~/.config/fish/config.fish      # fish
 ```
-source $HOME/.bashrc
-nvim # Chờ hoàn tất cài đặt plugin
+
+Mở Neovim một lần để hoàn tất cài đặt plugin:
+
+```bash
+nvim
+# Chờ plugin cài xong, rồi nhấn <Space>qq để thoát
 ```
-Để thoát Neovim: nhấn `<space> q q`
 
-## Lưu ý
-- Đã thử nghiệm trên: Debian, Ubuntu, Fedora, CentOS Stream, và Arch Linux
-- Phải chạy từ `bash` shell
-- Cần quyền `sudo` để cài đặt `build essentials`, `tmux`, và `nushell`
-- Có thể hơi ngợp cho người dùng mới
-- Một số tools có thể dư thừa với nhu cầu của bạn
+## Chế Độ Tự Động (Không TUI)
 
-## Kế hoạch
-- Hỗ trợ các bản phân phối của linux khác
-- Cá nhân hóa cài đặt
-- Trải niệm trên Docker
+Bỏ qua giao diện và cài tất cả tự động:
 
-## Bản quyền
+```bash
+bash install.sh --all
+# hoặc
+CI=true bash install.sh
+```
+
+## Các Distro Được Hỗ Trợ
+
+Ubuntu 24.04 · Debian 13 · Fedora 43 · Arch Linux
+
+## Bản Quyền
+
 MIT
