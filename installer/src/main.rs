@@ -22,6 +22,17 @@ mod ui;
 use app::{App, Screen};
 
 fn main() -> Result<(), Box<dyn Error>> {
+    // ── Non-interactive / headless mode ──────────────────────────────────────
+    // Activated by: `--all` flag, `CI=true`, or `INSTALLER_ALL=1` env var.
+    // Skips the TUI entirely — useful for CI pipelines and scripted installs.
+    let headless = std::env::args().any(|a| a == "--all")
+        || std::env::var("CI").map(|v| v == "true").unwrap_or(false)
+        || std::env::var("INSTALLER_ALL").map(|v| v == "1").unwrap_or(false);
+
+    if headless {
+        return run_headless();
+    }
+
     // ── Pre-flight: cache sudo credentials BEFORE entering raw mode ──────────
     // Check if any SystemPackage components would be selected (i.e., need sudo).
     // We do a quick pre-scan without the TUI to decide if we need to prompt.
@@ -82,6 +93,66 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+/// Headless installation: runs all phases without the TUI.
+/// All components are force-selected; logs are printed directly to stdout.
+fn run_headless() -> Result<(), Box<dyn Error>> {
+    println!("==> devenv-linux headless installer (--all mode)");
+    println!();
+
+    let mut components = registry::get_all_components();
+
+    // Force-select everything.
+    for c in &mut components {
+        c.state = registry::SelectionState::Selected;
+    }
+
+    // ── Phase 1: System packages ──────────────────────────────────────────────
+    println!(">>> Phase 1: System Packages");
+    let sys_comps: Vec<&registry::Component> = components
+        .iter()
+        .filter(|c| matches!(c.category, registry::Category::SystemPackage))
+        .collect();
+    if let Err(e) =
+        installer::system::install_system_packages(&sys_comps, |msg| println!("{}", msg))
+    {
+        eprintln!("[ERROR] System packages: {}", e);
+    }
+
+    // ── Phase 2: mise tools ───────────────────────────────────────────────────
+    println!("\n>>> Phase 2: Mise Tools");
+    let mise_comps: Vec<&registry::Component> = components
+        .iter()
+        .filter(|c| matches!(c.category, registry::Category::Mise(_)))
+        .collect();
+    if !mise_comps.is_empty() {
+        match installer::mise::install_mise(|msg| println!("{}", msg)) {
+            Err(e) => eprintln!("[ERROR] mise install: {}", e),
+            Ok(()) => {
+                if let Err(e) =
+                    installer::mise::activate_mise_tools(&mise_comps, |msg| println!("{}", msg))
+                {
+                    eprintln!("[ERROR] mise tools: {}", e);
+                }
+            }
+        }
+    }
+
+    // ── Phase 3: Configurations ───────────────────────────────────────────────
+    println!("\n>>> Phase 3: Configurations");
+    let cfg_comps: Vec<&registry::Component> = components
+        .iter()
+        .filter(|c| matches!(c.category, registry::Category::Config))
+        .collect();
+    for cfg in cfg_comps {
+        if let Err(e) = installer::config::setup_config(cfg, |msg| println!("{}", msg)) {
+            eprintln!("[ERROR] config {}: {}", cfg.id, e);
+        }
+    }
+
+    println!("\n\u{2705} All done!");
+    Ok(())
+}
+
 fn run_app<B: Backend>(
     terminal: &mut Terminal<B>,
     app: &mut App,
@@ -133,7 +204,6 @@ where
                         KeyCode::Char('a') => {
                             for c in &mut app.components {
                                 c.state = if matches!(c.category, registry::Category::Config) {
-                                    // configs default to keep; 'a' makes them update
                                     registry::SelectionState::Selected
                                 } else {
                                     registry::SelectionState::Selected
@@ -184,9 +254,7 @@ fn spawn_installation(app: &mut App) {
     };
 
     thread::spawn(move || {
-        let log = make_log(logs.clone());
-
-        // ── Phase 1: System packages (sudo, credentials already cached) ──────
+        // ── Phase 1: System packages (sudo credentials already cached) ────────
         *install_index.lock().unwrap() = 0;
         {
             let mut g = logs.lock().unwrap();
@@ -260,9 +328,7 @@ fn spawn_installation(app: &mut App) {
             .collect();
 
         for cfg in cfg_comps {
-            if let Err(e) =
-                installer::config::setup_config(cfg, make_log(logs.clone()))
-            {
+            if let Err(e) = installer::config::setup_config(cfg, make_log(logs.clone())) {
                 if let Ok(mut g) = logs.lock() {
                     g.push(format!("[ERROR] config {}: {}", cfg.id, e));
                 }

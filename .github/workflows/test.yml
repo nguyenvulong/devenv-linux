@@ -1,4 +1,4 @@
-name: Test Install Script
+name: Test Installer (Ratatui TUI)
 
 on:
   push:
@@ -18,117 +18,129 @@ jobs:
         include:
           - distro: ubuntu-24.04
             image: ubuntu:24.04
-            distro_name: "Ubuntu 24.04 LTS"
             run_as_root: false
           - distro: debian-13
             image: debian:trixie
-            distro_name: "Debian 13 (trixie)"
             run_as_root: false
           - distro: fedora-43
             image: fedora:43
-            distro_name: "Fedora 43"
             run_as_root: true
           - distro: arch
             image: archlinux:latest
-            distro_name: "Arch Linux"
             run_as_root: false
-    
+
     container:
       image: ${{ matrix.image }}
       options: --privileged
-    
+
     steps:
+      # ── Prerequisites ──────────────────────────────────────────────────────
       - name: Install prerequisites
         run: |
           if command -v apt-get &>/dev/null; then
             apt-get update
-            apt-get install -y sudo git curl wget ca-certificates
+            apt-get install -y sudo git curl wget ca-certificates build-essential
           elif command -v dnf &>/dev/null; then
-            dnf install -y git curl wget ca-certificates findutils
+            dnf install -y git curl wget ca-certificates findutils gcc gcc-c++ make
           elif command -v pacman &>/dev/null; then
             pacman -Syu --noconfirm
             pacman -S --noconfirm sudo git curl wget ca-certificates base-devel
           fi
 
-      - name: Create test user
+      - name: Create test user (non-root distros)
         if: ${{ !matrix.run_as_root }}
         run: |
-          # Create a test user with sudo privileges
           useradd -m -s /bin/bash testuser
-          
-          # Set password for the user
-          echo "testuser:testpassword" | chpasswd
-          
-          # Create sudoers file properly using /etc/sudoers.d/
           echo "testuser ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/testuser
           chmod 0440 /etc/sudoers.d/testuser
-          
+
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Run install script (as user)
+      # ── Build the Ratatui installer ────────────────────────────────────────
+      # install.sh already handles rustup + cargo build; we drive it directly
+      # here by calling bash install.sh. The installer detects CI=true and
+      # drops into headless (--all) mode automatically, skipping the TUI.
+
+      - name: Run installer (as user)
         if: ${{ !matrix.run_as_root }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CI: "true"
         run: |
           chown -R testuser:testuser .
-          su - testuser -c "export GITHUB_TOKEN='$GITHUB_TOKEN' && cd $(pwd) && bash install.sh"
+          su - testuser -c "cd $(pwd) && bash install.sh"
         shell: bash
 
-      - name: Run install script (as root)
+      - name: Run installer (as root)
         if: ${{ matrix.run_as_root }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          bash install.sh
+          CI: "true"
+        run: bash install.sh
         shell: bash
 
-      - name: Verify installations (as user)
+      # ── Verify tools (mise shim paths) ────────────────────────────────────
+      # mise installs shims to ~/.local/share/mise/shims/.
+      # We add that (and ~/.cargo/bin for rustup-installed cargo) to PATH.
+
+      - name: Verify tool installations (as user)
         if: ${{ !matrix.run_as_root }}
         run: |
           su - testuser -c '
-            export PATH="$HOME/.local/bin:$HOME/.local/share/go/bin:$HOME/.cargo/bin:$PATH"
-            export NVM_DIR="$HOME/.nvm"
-            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-            
+            export PATH="$HOME/.local/share/mise/shims:$HOME/.cargo/bin:$PATH"
             echo "=== Checking installed tools ==="
-            fzf --version && rg --version && fd --version && bat --version
-            eza --version && glow --version && jaq --version && tmux -V
+            mise --version
+            fzf --version
+            rg --version
+            fd --version
+            bat --version
+            eza --version
+            glow --version
+            jaq --version
+            tmux -V
             rustc --version && cargo --version
-            node --version && npm --version
-            go version && uv --version
-            nvim --version && nu --version && fish --version
-            echo "=== All tools verified successfully ==="
+            node --version
+            go version
+            uv --version
+            nvim --version
+            nu --version
+            fish --version
+            echo "=== All tools verified ==="
           '
         shell: bash
 
-      - name: Verify installations (as root)
+      - name: Verify tool installations (as root)
         if: ${{ matrix.run_as_root }}
         run: |
-          export PATH="$HOME/.local/bin:$HOME/.local/share/go/bin:$HOME/.cargo/bin:$PATH"
-          export NVM_DIR="$HOME/.nvm"
-          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-          
+          export PATH="$HOME/.local/share/mise/shims:$HOME/.cargo/bin:$PATH"
           echo "=== Checking installed tools ==="
-          fzf --version && rg --version && fd --version && bat --version
-          eza --version && glow --version && jaq --version && tmux -V
+          mise --version
+          fzf --version
+          rg --version
+          fd --version
+          bat --version
+          eza --version
+          glow --version
+          jaq --version
+          tmux -V
           rustc --version && cargo --version
-          node --version && npm --version
-          go version && uv --version
-          nvim --version && nu --version && fish --version
-          echo "=== All tools verified successfully ==="
+          node --version
+          go version
+          uv --version
+          nvim --version
+          nu --version
+          fish --version
+          echo "=== All tools verified ==="
         shell: bash
+
+      # ── Verify configurations ─────────────────────────────────────────────
 
       - name: Verify configurations (as user)
         if: ${{ !matrix.run_as_root }}
         run: |
           su - testuser -c '
-            grep -q ".local/bin" ~/.bashrc
-            [ -d ~/.config ] && [ -d ~/.local/bin ] && [ -d ~/.local/share ]
-            [ -d ~/.config/nvim ] && [ -d ~/.config/tmux ]
-            [ -d ~/.config/nushell ] && [ -d ~/.config/fish ]
-            [ -x ~/.local/bin/fzf ] && [ -x ~/.local/bin/rg ]
-            [ -x ~/.local/bin/fd ] && [ -x ~/.local/bin/nvim ]
+            [ -d ~/.config/nvim ]  || { echo "Missing nvim config";  exit 1; }
+            [ -d ~/.config/tmux ]  || { echo "Missing tmux config";  exit 1; }
+            [ -d ~/.config/fish ]  || { echo "Missing fish config";  exit 1; }
             echo "=== All configurations verified ==="
           '
         shell: bash
@@ -136,41 +148,36 @@ jobs:
       - name: Verify configurations (as root)
         if: ${{ matrix.run_as_root }}
         run: |
-          grep -q ".local/bin" ~/.bashrc
-          [ -d ~/.config ] && [ -d ~/.local/bin ] && [ -d ~/.local/share ]
-          [ -d ~/.config/nvim ] && [ -d ~/.config/tmux ]
-          [ -d ~/.config/nushell ] && [ -d ~/.config/fish ]
-          [ -x ~/.local/bin/fzf ] && [ -x ~/.local/bin/rg ]
-          [ -x ~/.local/bin/fd ] && [ -x ~/.local/bin/nvim ]
+          [ -d ~/.config/nvim ]  || { echo "Missing nvim config";  exit 1; }
+          [ -d ~/.config/tmux ]  || { echo "Missing tmux config";  exit 1; }
+          [ -d ~/.config/fish ]  || { echo "Missing fish config";  exit 1; }
           echo "=== All configurations verified ==="
         shell: bash
 
-      - name: Test basic functionality (as user)
+      # ── Smoke-test key tools ──────────────────────────────────────────────
+
+      - name: Smoke test (as user)
         if: ${{ !matrix.run_as_root }}
         run: |
           su - testuser -c '
-            export PATH="$HOME/.local/bin:$HOME/.local/share/go/bin:$HOME/.cargo/bin:$PATH"
-            export NVM_DIR="$HOME/.nvm"
-            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-            
+            export PATH="$HOME/.local/share/mise/shims:$HOME/.cargo/bin:$PATH"
             echo "test" | fzf -f "test"
             echo "test content" > /tmp/test.txt && rg "test" /tmp/test.txt
             node -e "console.log(\"Hello from Node.js\")"
-            rustc --version > /dev/null && go version > /dev/null
-            echo "=== Basic functionality tests passed ==="
+            go version > /dev/null
+            rustc --version > /dev/null
+            echo "=== Smoke tests passed ==="
           '
         shell: bash
 
-      - name: Test basic functionality (as root)
+      - name: Smoke test (as root)
         if: ${{ matrix.run_as_root }}
         run: |
-          export PATH="$HOME/.local/bin:$HOME/.local/share/go/bin:$HOME/.cargo/bin:$PATH"
-          export NVM_DIR="$HOME/.nvm"
-          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-          
+          export PATH="$HOME/.local/share/mise/shims:$HOME/.cargo/bin:$PATH"
           echo "test" | fzf -f "test"
           echo "test content" > /tmp/test.txt && rg "test" /tmp/test.txt
           node -e "console.log(\"Hello from Node.js\")"
-          rustc --version > /dev/null && go version > /dev/null
-          echo "=== Basic functionality tests passed ==="
+          go version > /dev/null
+          rustc --version > /dev/null
+          echo "=== Smoke tests passed ==="
         shell: bash

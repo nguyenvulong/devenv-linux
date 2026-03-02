@@ -47,4 +47,4 @@ cargo build --release
 
 # 4. Run the installer
 echo -e "${GREEN}Starting the installer...${NC}"
-./target/release/installer
+./target/release/installer "$@"
