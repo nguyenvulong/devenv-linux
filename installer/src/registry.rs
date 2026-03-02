@@ -211,6 +211,14 @@ pub fn get_all_components() -> Vec<Component> {
             &[],
         ),
         Component::new(
+            "config-nushell",
+            "Nushell Configuration",
+            "Adds mise shims to PATH in env.nu",
+            Category::Config,
+            None,
+            &[],
+        ),
+        Component::new(
             "config-nvim",
             "LazyVim Setup",
             "LazyVim starter + OSC52 clipboard",

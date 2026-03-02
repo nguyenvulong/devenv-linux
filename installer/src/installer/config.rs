@@ -17,9 +17,10 @@ where
     match component.id.as_str() {
         "config-fish" => {
             let config_dir = format!("{}/.config/fish", home);
-            fs::create_dir_all(&config_dir).map_err(|e| format!("Failed to create {}: {}", config_dir, e))?;
+            fs::create_dir_all(&config_dir)
+                .map_err(|e| format!("Failed to create {}: {}", config_dir, e))?;
             let dest = format!("{}/config.fish", config_dir);
-            
+
             log("Writing generic fish config...");
             let content = "
 # colors
@@ -43,9 +44,11 @@ function history
     builtin history --show-time=\"%Y-%m-%d %H:%M:%S \" $argv
 end
 ";
-            fs::write(&dest, content).map_err(|e| format!("Failed to write config.fish: {}", e))?;
+            fs::write(&dest, content)
+                .map_err(|e| format!("Failed to write config.fish: {}", e))?;
             Ok(())
         }
+
         "config-tmux" => {
             let tmux_dir = format!("{}/.config/tmux", home);
             if Path::new(&tmux_dir).exists() {
@@ -53,9 +56,13 @@ end
                 log(&format!("Backing up existing tmux config to {}", backup));
                 let _ = run_cmd("mv", &[&tmux_dir, &backup]);
             }
-            
+
             log("Cloning oh-my-tmux...");
-            let res = run_cmd_streaming("git", &["clone", "--single-branch", "https://github.com/gpakosz/.tmux.git", &tmux_dir], log.clone());
+            let res = run_cmd_streaming(
+                "git",
+                &["clone", "--single-branch", "https://github.com/gpakosz/.tmux.git", &tmux_dir],
+                log.clone(),
+            );
             if !res.success {
                 return Err("Failed to clone oh-my-tmux".into());
             }
@@ -63,9 +70,45 @@ end
             log("Setting up symlinks...");
             let _ = run_cmd("ln", &["-sf", &format!("{}/.tmux.conf", tmux_dir), &format!("{}/.tmux.conf", home)]);
             let _ = run_cmd("cp", &[&format!("{}/.tmux.conf.local", tmux_dir), &format!("{}/tmux.conf.local", tmux_dir)]);
-            
+
             Ok(())
         }
+
+        "config-nushell" => {
+            let nu_dir = format!("{}/.config/nushell", home);
+            fs::create_dir_all(&nu_dir)
+                .map_err(|e| format!("Failed to create {}: {}", nu_dir, e))?;
+            let env_nu = format!("{}/env.nu", nu_dir);
+
+            // Idiomatic Nushell: prepend mise shims to PATH, deduplicated.
+            let mise_line = "$env.PATH = ($env.PATH | split row (char esep) | prepend ($env.HOME | path join \".local\" \"share\" \"mise\" \"shims\") | uniq)\n";
+
+            // Only append if the line isn't already there (idempotent).
+            let already_set = if Path::new(&env_nu).exists() {
+                fs::read_to_string(&env_nu)
+                    .map(|s| s.contains(".local/share/mise/shims"))
+                    .unwrap_or(false)
+            } else {
+                false
+            };
+
+            if already_set {
+                log("Nushell env.nu already contains mise shims PATH — skipping.");
+            } else {
+                log(&format!("Appending mise shims PATH to {}", env_nu));
+                use std::io::Write;
+                let mut f = fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(&env_nu)
+                    .map_err(|e| format!("Failed to open {}: {}", env_nu, e))?;
+                writeln!(f, "\n# mise shims — added by devenv-linux installer").ok();
+                write!(f, "{}", mise_line)
+                    .map_err(|e| format!("Failed to write env.nu: {}", e))?;
+            }
+            Ok(())
+        }
+
         "config-nvim" => {
             let nvim_dir = format!("{}/.config/nvim", home);
             if Path::new(&nvim_dir).exists() {
@@ -73,9 +116,13 @@ end
                 log(&format!("Backing up existing nvim config to {}", backup));
                 let _ = run_cmd("mv", &[&nvim_dir, &backup]);
             }
-            
+
             log("Cloning LazyVim starter...");
-            let res = run_cmd_streaming("git", &["clone", "https://github.com/LazyVim/starter", &nvim_dir], log.clone());
+            let res = run_cmd_streaming(
+                "git",
+                &["clone", "https://github.com/LazyVim/starter", &nvim_dir],
+                log.clone(),
+            );
             if !res.success {
                 return Err("Failed to clone LazyVim".into());
             }
@@ -105,9 +152,10 @@ vim.g.clipboard = {
             if let Ok(mut f) = fs::OpenOptions::new().append(true).open(&opt_file) {
                 let _ = write!(f, "{}", osc52_cfg);
             }
-            
+
             Ok(())
         }
+
         _ => {
             log(&format!("Unknown config component: {}", component.id));
             Ok(())

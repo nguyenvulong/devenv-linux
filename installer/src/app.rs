@@ -42,6 +42,12 @@ impl App {
                             std::path::Path::new(&format!("{}/.config/fish/config.fish", home))
                                 .exists()
                         }
+                        "config-nushell" => {
+                            // Consider it installed only if the shims line is already present.
+                            std::fs::read_to_string(format!("{}/.config/nushell/env.nu", home))
+                                .map(|s| s.contains(".local/share/mise/shims"))
+                                .unwrap_or(false)
+                        }
                         _ => false,
                     };
                     if config_exists {
