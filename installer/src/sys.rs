@@ -81,13 +81,22 @@ where
     }
 }
 
+/// Returns true if `cmd` exists as an executable file in any directory on PATH.
+/// Does not call `which` — works on any distro, including minimal containers.
 pub fn check_command_exists(cmd: &str) -> bool {
-    let output = Command::new("which").arg(cmd).output();
-    if let Ok(output) = output {
-        output.status.success()
-    } else {
-        false
-    }
+    // Also check the mise shims dir explicitly, since it may not be on PATH yet.
+    let home = std::env::var("HOME").unwrap_or_default();
+    let mise_shims = std::path::PathBuf::from(&home)
+        .join(".local/share/mise/shims");
+
+    let path_var = std::env::var("PATH").unwrap_or_default();
+    let mut dirs: Vec<std::path::PathBuf> = std::env::split_paths(&path_var).collect();
+    dirs.push(mise_shims);
+
+    dirs.iter().any(|dir| {
+        let candidate = dir.join(cmd);
+        candidate.is_file()
+    })
 }
 
 pub fn get_distro() -> String {

@@ -1,5 +1,5 @@
 use crate::registry::{Component, Category};
-use crate::sys::{run_cmd_streaming, run_cmd};
+use crate::sys::run_cmd_streaming;
 use std::fs;
 
 pub fn install_mise<F>(mut log: F) -> Result<(), String>
@@ -7,7 +7,7 @@ where
     F: FnMut(&str) + Send + 'static,
 {
     log("Checking for mise...");
-    if run_cmd("which", &["mise"]).success {
+    if crate::sys::check_command_exists("mise") {
         log("mise is already installed.");
         return Ok(());
     }
@@ -43,7 +43,7 @@ where
 
     // We must ensure ~/.local/bin/mise exists or we just use `mise` if it's on PATH
     let mut mise_path = "mise".to_string();
-    if !run_cmd("which", &["mise"]).success {
+    if !crate::sys::check_command_exists("mise") {
         let home_mise = format!("{}/.local/bin/mise", std::env::var("HOME").unwrap_or_default());
         if fs::metadata(&home_mise).is_ok() {
             mise_path = home_mise;

@@ -57,10 +57,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ── Build the Ratatui installer ────────────────────────────────────────
-      # install.sh already handles rustup + cargo build; we drive it directly
-      # here by calling bash install.sh. The installer detects CI=true and
-      # drops into headless (--all) mode automatically, skipping the TUI.
+      # ── Build + run the Ratatui installer ──────────────────────────────────
+      # install.sh handles rustup + cargo build, then launches the installer.
+      # --all forces headless mode: selects all components, no TUI, no TTY needed.
 
       - name: Run installer (as user)
         if: ${{ !matrix.run_as_root }}
@@ -68,14 +67,14 @@ jobs:
           CI: "true"
         run: |
           chown -R testuser:testuser .
-          su - testuser -c "cd $(pwd) && bash install.sh"
+          su - testuser -c "cd $(pwd) && bash install.sh --all"
         shell: bash
 
       - name: Run installer (as root)
         if: ${{ matrix.run_as_root }}
         env:
           CI: "true"
-        run: bash install.sh
+        run: bash install.sh --all
         shell: bash
 
       # ── Verify tools (mise shim paths) ────────────────────────────────────
