@@ -136,8 +136,7 @@ fn draw_report(f: &mut Frame, app: &mut App) {
             SelectionState::KeepAsIs => "Skipped (Kept as is)".to_string(),
             SelectionState::Selected => {
                 match &c.status {
-                    InstallStatus::Installed(_) | InstallStatus::UpdateAvailable{..} => "Installed / Updated".to_string(),
-                    InstallStatus::Failed(e) => format!("Failed ({})", e),
+                    InstallStatus::Installed(_) => "Installed / Updated".to_string(),
                     _ => "Processed".to_string()
                 }
             }

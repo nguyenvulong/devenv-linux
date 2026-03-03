@@ -108,8 +108,7 @@ All tools that previously used hand-rolled GitHub release downloads have been re
 
 > Update this section as work progresses.
 
-- [ ] **Version detection** — the initial scan only checks if a binary exists, not its version. Wire up `get_installed_version()` in `sys.rs` to populate `InstallStatus::Installed(version_string)` properly and show `UpdateAvailable` when mise has a newer release.
-- [ ] **`ureq` / `semver` crates unused** — they were planned for version comparison via GitHub API but not yet implemented. Either implement version checking or remove from `Cargo.toml`.
+- [ ] Enhance dotfiles installation using actual stow/symlink mechanics if current simple bash scripts break across differing Linux flavors (optional).
 ---
 
 ## CI / Testing
@@ -161,7 +160,7 @@ Commits should follow Conventional Commits format: `feat:`, `fix:`, `chore:`, `d
 ## Changelog
 
 | Date | Change |
-|------|--------|
+|------|---------|
 | 2026-03-02 | Replace monolithic `install.sh` (712 lines) with Ratatui TUI installer (`installer/`) |
 | 2026-03-02 | Move all tool installs to `mise`; eliminate all direct GitHub release downloads |
 | 2026-03-02 | Fix sudo TTY issue: pre-authenticate before TUI, run installation on background thread |
@@ -170,3 +169,6 @@ Commits should follow Conventional Commits format: `feat:`, `fix:`, `chore:`, `d
 | 2026-03-03 | Update CI workflow (`test.yml`) for Ratatui installer + mise shim paths |
 | 2026-03-03 | Add `config-nushell`: writes mise shims PATH to `~/.config/nushell/env.nu` |
 | 2026-03-03 | Rewrite `README.md` and `README_vi.md` for novice quick-start |
+| 2026-03-03 | Remove unused `InstallStatus` variants and `check_args` field; prefix `_stdout` to silence dead code warnings |
+| 2026-03-03 | Implement version detection using `mise ls` and standard command versions, display in TUI |
+| 2026-03-03 | Remove unused `ureq`, `semver`, and `serde` crates from `Cargo.toml` |

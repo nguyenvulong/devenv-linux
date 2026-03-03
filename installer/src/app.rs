@@ -58,11 +58,41 @@ impl App {
                         c.status = InstallStatus::NotInstalled;
                     }
                 }
-                _ => {
-                    if let Some(cmd) = &c.check_command {
+                Category::Mise(tool) => {
+                    // 1) Check exact version managed by mise 
+                    if let Some(v) = crate::sys::get_mise_tool_version(tool) {
+                        c.state = SelectionState::Unselected;
+                        c.status = InstallStatus::Installed(v);
+                    } else if let Some(cmd) = &c.check_command {
+                        // 2) Fallback: just check if command is on PATH
                         if crate::sys::check_command_exists(cmd) {
                             c.state = SelectionState::Unselected;
                             c.status = InstallStatus::Installed("Detected".to_string());
+                        } else {
+                            c.state = SelectionState::Selected;
+                            c.status = InstallStatus::NotInstalled;
+                        }
+                    } else {
+                        c.state = SelectionState::Selected;
+                        c.status = InstallStatus::NotInstalled;
+                    }
+                }
+                Category::SystemPackage => {
+                    if let Some(cmd) = &c.check_command {
+                        if crate::sys::check_command_exists(cmd) {
+                            c.state = SelectionState::Unselected;
+                            
+                            // Try to get version using check_args
+                            let args: Vec<&str> = c.check_args.iter().map(|s| s.as_str()).collect();
+                            if !args.is_empty() {
+                                if let Some(version) = crate::sys::get_command_version(cmd, &args) {
+                                    c.status = InstallStatus::Installed(version);
+                                } else {
+                                    c.status = InstallStatus::Installed("Detected".to_string());
+                                }
+                            } else {
+                                c.status = InstallStatus::Installed("Detected".to_string());
+                            }
                         } else {
                             c.state = SelectionState::Selected;
                             c.status = InstallStatus::NotInstalled;

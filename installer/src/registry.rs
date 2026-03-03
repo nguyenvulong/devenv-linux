@@ -15,8 +15,6 @@ pub enum InstallStatus {
     Checking,
     NotInstalled,
     Installed(String),
-    UpdateAvailable { current: String, latest: String },
-    Failed(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -4,7 +4,7 @@ use std::thread;
 
 pub struct CommandResult {
     pub success: bool,
-    pub stdout: String,
+    pub _stdout: String,
     pub stderr: String,
 }
 
@@ -16,7 +16,7 @@ pub fn run_cmd(cmd: &str, args: &[&str]) -> CommandResult {
 
     CommandResult {
         success: output.status.success(),
-        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+        _stdout: String::from_utf8_lossy(&output.stdout).to_string(),
         stderr: String::from_utf8_lossy(&output.stderr).to_string(),
     }
 }
@@ -76,7 +76,7 @@ where
     
     CommandResult {
         success: status.success(),
-        stdout: stdout_thread.join().unwrap(),
+        _stdout: stdout_thread.join().unwrap(),
         stderr: stderr_thread.join().unwrap(),
     }
 }
@@ -111,3 +111,88 @@ pub fn get_distro() -> String {
         "unknown".to_string()
     }
 }
+
+/// Returns the currently active version of a tool managed by mise by running `mise ls <tool>`.
+/// Examples of output we parse:
+/// "rust   1.81.0    ~/.config/mise/config.toml" -> "1.81.0"
+/// "node   22.0.0    (missing)" -> "22.0.0" (Even if missing locally, it's what's configured)
+pub fn get_mise_tool_version(tool: &str) -> Option<String> {
+    if !check_command_exists("mise") {
+        return None;
+    }
+
+    // Call `mise ls <tool>` and parse its stdout.
+    // E.g., `mise ls rust` 
+    let out = Command::new("mise")
+        .args(["ls", tool])
+        .output()
+        .ok()?;
+
+    if !out.status.success() {
+        return None; // Tool might not be known to mise yet.
+    }
+
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    
+    // The format is typically: <tool> <version> <source>
+    // We want the first line that starts with the tool name, and extract the second column.
+    for line in stdout.lines() {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        // parts[0] is the tool name (or alias), parts[1] is the version
+        if parts.len() >= 2 && parts[0] == tool {
+            let version = parts[1];
+            // Ignore placeholders like "(missing)" if they end up here
+            if !version.starts_with('(') {
+                return Some(version.to_string());
+            }
+        }
+    }
+    
+    None
+}
+
+/// Runs a generic command with args (e.g. `["--version"]`) and tries to
+/// extract a version-like string from the first line of output.
+pub fn get_command_version(cmd: &str, args: &[&str]) -> Option<String> {
+    if !check_command_exists(cmd) {
+        return None;
+    }
+
+    let out = Command::new(cmd)
+        .args(args)
+        .output()
+        .ok()?;
+
+    if !out.status.success() {
+        return None;
+    }
+
+    // Look at both stdout and stderr (some tools print version to stderr, e.g., java)
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    let combined = format!("{}\n{}", stdout, stderr);
+
+    // Grab the first non-empty line
+    let first_line = combined.lines().find(|l| !l.trim().is_empty())?;
+
+    // Very naive version extraction: extract the first contiguous block that starts with a digit
+    // e.g. "rustc 1.70.0 (90c541806 2023-05-31)" -> "1.70.0"
+    // e.g. "tmux 3.3a" -> "3.3a"
+    let parts: Vec<&str> = first_line.split_whitespace().collect();
+    for part in parts {
+        // Find a string that looks like a version (starts with a digit or 'v' + digit)
+        let clean_part = part.trim_start_matches('v'); // handle "v1.2.3"
+        if clean_part.chars().next().map_or(false, |c| c.is_ascii_digit()) {
+            return Some(clean_part.to_string());
+        }
+    }
+
+    // Fallback if we couldn't parse a number out of it, just return the first line up to 20 chars
+    let fallback = first_line.trim();
+    if fallback.len() > 20 {
+        Some(format!("{}...", &fallback[..17]))
+    } else {
+        Some(fallback.to_string())
+    }
+}
+
