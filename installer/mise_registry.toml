@@ -1,0 +1,488 @@
+# mise_registry.toml — Curated top-100 mise-installable tools
+# Embedded into the installer binary at compile time.
+# Used as the primary search source; runtime `mise registry` is used as fallback.
+
+[[tool]]
+name = "lazygit"
+mise_id = "aqua:jesseduffield/lazygit"
+description = "Simple terminal UI for git commands"
+
+[[tool]]
+name = "lazydocker"
+mise_id = "aqua:jesseduffield/lazydocker"
+description = "Simple terminal UI for Docker and docker-compose"
+
+[[tool]]
+name = "delta"
+mise_id = "aqua:dandavison/delta"
+description = "Syntax-highlighting pager for git, diff, and grep output"
+
+[[tool]]
+name = "zoxide"
+mise_id = "aqua:ajeetdsouza/zoxide"
+description = "Smarter cd command that learns your habits"
+
+[[tool]]
+name = "starship"
+mise_id = "aqua:starship/starship"
+description = "Cross-shell prompt with rich git and status info"
+
+[[tool]]
+name = "atuin"
+mise_id = "aqua:atuinsh/atuin"
+description = "Magical shell history with sync and search"
+
+[[tool]]
+name = "yazi"
+mise_id = "aqua:sxyazi/yazi"
+description = "Blazing-fast terminal file manager"
+
+[[tool]]
+name = "helix"
+mise_id = "aqua:helix-editor/helix"
+description = "Post-modern modal text editor"
+
+[[tool]]
+name = "nushell"
+mise_id = "aqua:nushell/nushell"
+description = "A new type of shell with structured data"
+
+[[tool]]
+name = "fish"
+mise_id = "aqua:fish-shell/fish-shell"
+description = "The friendly interactive shell"
+
+[[tool]]
+name = "zsh"
+mise_id = "core:zsh"
+description = "Z shell — extended Bourne shell"
+
+[[tool]]
+name = "direnv"
+mise_id = "aqua:direnv/direnv"
+description = "Load/unload environment variables depending on directory"
+
+[[tool]]
+name = "gh"
+mise_id = "aqua:cli/cli"
+description = "GitHub CLI — work with GitHub from the terminal"
+
+[[tool]]
+name = "glab"
+mise_id = "aqua:gitlab-org/cli"
+description = "GitLab CLI — work with GitLab from the terminal"
+
+[[tool]]
+name = "git-lfs"
+mise_id = "aqua:git-lfs/git-lfs"
+description = "Git extension for versioning large files"
+
+[[tool]]
+name = "jq"
+mise_id = "aqua:jqlang/jq"
+description = "Command-line JSON processor"
+
+[[tool]]
+name = "jaq"
+mise_id = "aqua:01mf02/jaq"
+description = "jq clone focused on correctness, speed, and simplicity"
+
+[[tool]]
+name = "yq"
+mise_id = "aqua:mikefarah/yq"
+description = "YAML/JSON/TOML processor (like jq for YAML)"
+
+[[tool]]
+name = "ripgrep"
+mise_id = "aqua:BurntSushi/ripgrep"
+description = "Recursively search directories for a regex pattern"
+
+[[tool]]
+name = "fd"
+mise_id = "aqua:sharkdp/fd"
+description = "Simple, fast and user-friendly alternative to find"
+
+[[tool]]
+name = "bat"
+mise_id = "aqua:sharkdp/bat"
+description = "A cat(1) clone with syntax highlighting and git integration"
+
+[[tool]]
+name = "fzf"
+mise_id = "aqua:junegunn/fzf"
+description = "Command-line fuzzy finder"
+
+[[tool]]
+name = "eza"
+mise_id = "aqua:eza-community/eza"
+description = "Modern, maintained replacement for ls"
+
+[[tool]]
+name = "glow"
+mise_id = "aqua:charmbracelet/glow"
+description = "Render markdown on the CLI with style"
+
+[[tool]]
+name = "mdcat"
+mise_id = "aqua:swsnr/mdcat"
+description = "Cat markdown to the terminal with inline images"
+
+[[tool]]
+name = "dust"
+mise_id = "aqua:bootandy/dust"
+description = "More intuitive version of du written in Rust"
+
+[[tool]]
+name = "duf"
+mise_id = "aqua:muesli/duf"
+description = "Disk usage/free utility — better than df"
+
+[[tool]]
+name = "procs"
+mise_id = "aqua:dalance/procs"
+description = "Modern replacement for ps written in Rust"
+
+[[tool]]
+name = "bottom"
+mise_id = "aqua:ClementTsang/bottom"
+description = "Graphical process/system monitor for the terminal (btm)"
+
+[[tool]]
+name = "bpytop"
+mise_id = "pipx:bpytop"
+description = "Resource monitor that shows usage and stats for CPU, memory, disks"
+
+[[tool]]
+name = "htop"
+mise_id = "aqua:htop-dev/htop"
+description = "Interactive process viewer"
+
+[[tool]]
+name = "hyperfine"
+mise_id = "aqua:sharkdp/hyperfine"
+description = "Command-line benchmarking tool"
+
+[[tool]]
+name = "tokei"
+mise_id = "aqua:XAMPPRocky/tokei"
+description = "Count lines of code quickly and accurately"
+
+[[tool]]
+name = "bandwhich"
+mise_id = "aqua:imsnif/bandwhich"
+description = "Terminal bandwidth utilization tool"
+
+[[tool]]
+name = "dog"
+mise_id = "aqua:ogham/dog"
+description = "Command-line DNS client (nicer than dig)"
+
+[[tool]]
+name = "curlie"
+mise_id = "aqua:rs/curlie"
+description = "Power of curl with the ease of use of httpie"
+
+[[tool]]
+name = "xh"
+mise_id = "aqua:ducaale/xh"
+description = "Friendly and fast HTTP client (httpie reimplemented in Rust)"
+
+[[tool]]
+name = "httpie"
+mise_id = "pipx:httpie"
+description = "User-friendly HTTP client for the CLI"
+
+[[tool]]
+name = "mkcert"
+mise_id = "aqua:FiloSottile/mkcert"
+description = "Make locally trusted development certificates"
+
+[[tool]]
+name = "just"
+mise_id = "aqua:casey/just"
+description = "Just a command runner — a better make"
+
+[[tool]]
+name = "task"
+mise_id = "aqua:go-task/task"
+description = "Task runner / build tool written in Go"
+
+[[tool]]
+name = "watchexec"
+mise_id = "aqua:watchexec/watchexec"
+description = "Execute commands in response to file system changes"
+
+[[tool]]
+name = "entr"
+mise_id = "aqua:eradman/entr"
+description = "Run arbitrary commands when files change"
+
+[[tool]]
+name = "tmux"
+mise_id = "aqua:tmux/tmux"
+description = "Terminal multiplexer"
+
+[[tool]]
+name = "zellij"
+mise_id = "aqua:zellij-org/zellij"
+description = "Terminal workspace with batteries included"
+
+[[tool]]
+name = "neovim"
+mise_id = "aqua:neovim/neovim"
+description = "Hyperextensible Vim-based text editor"
+
+[[tool]]
+name = "kakoune"
+mise_id = "aqua:mawww/kakoune"
+description = "Code editor inspired by Vim"
+
+[[tool]]
+name = "python"
+mise_id = "core:python"
+description = "Python language (via pyenv-compatible core backend)"
+
+[[tool]]
+name = "uv"
+mise_id = "aqua:astral-sh/uv"
+description = "Extremely fast Python package installer and resolver"
+
+[[tool]]
+name = "rye"
+mise_id = "aqua:astral-sh/rye"
+description = "Python project and package management tool"
+
+[[tool]]
+name = "poetry"
+mise_id = "pipx:poetry"
+description = "Python dependency management and packaging"
+
+[[tool]]
+name = "rust"
+mise_id = "core:rust"
+description = "Rust programming language and Cargo package manager"
+
+[[tool]]
+name = "cargo-binstall"
+mise_id = "aqua:cargo-bins/cargo-binstall"
+description = "Install cargo binaries without compiling"
+
+[[tool]]
+name = "cargo-nextest"
+mise_id = "aqua:nextest-rs/nextest"
+description = "Next-generation test runner for Rust"
+
+[[tool]]
+name = "node"
+mise_id = "core:node"
+description = "Node.js JavaScript runtime"
+
+[[tool]]
+name = "deno"
+mise_id = "aqua:denoland/deno"
+description = "Secure runtime for JavaScript and TypeScript"
+
+[[tool]]
+name = "bun"
+mise_id = "aqua:oven-sh/bun"
+description = "All-in-one JavaScript runtime and toolkit"
+
+[[tool]]
+name = "go"
+mise_id = "core:go"
+description = "Go programming language"
+
+[[tool]]
+name = "goreleaser"
+mise_id = "aqua:goreleaser/goreleaser"
+description = "Release automation tool for Go projects"
+
+[[tool]]
+name = "java"
+mise_id = "core:java"
+description = "Java Development Kit (OpenJDK)"
+
+[[tool]]
+name = "maven"
+mise_id = "aqua:apache/maven"
+description = "Build automation tool for Java"
+
+[[tool]]
+name = "gradle"
+mise_id = "aqua:gradle/gradle"
+description = "Build automation system for JVM projects"
+
+[[tool]]
+name = "kotlin"
+mise_id = "aqua:JetBrains/kotlin"
+description = "Kotlin programming language"
+
+[[tool]]
+name = "ruby"
+mise_id = "core:ruby"
+description = "Ruby programming language"
+
+[[tool]]
+name = "elixir"
+mise_id = "core:elixir"
+description = "Elixir programming language"
+
+[[tool]]
+name = "erlang"
+mise_id = "core:erlang"
+description = "Erlang programming language"
+
+[[tool]]
+name = "lua"
+mise_id = "aqua:lua/lua"
+description = "Lua programming language"
+
+[[tool]]
+name = "zig"
+mise_id = "aqua:ziglang/zig"
+description = "General-purpose programming language and toolchain"
+
+[[tool]]
+name = "terraform"
+mise_id = "aqua:hashicorp/terraform"
+description = "Infrastructure as Code tool by HashiCorp"
+
+[[tool]]
+name = "tofu"
+mise_id = "aqua:opentofu/opentofu"
+description = "Open-source Terraform fork (OpenTofu)"
+
+[[tool]]
+name = "ansible"
+mise_id = "pipx:ansible"
+description = "IT automation platform"
+
+[[tool]]
+name = "kubectl"
+mise_id = "aqua:kubernetes/kubectl"
+description = "Kubernetes command-line tool"
+
+[[tool]]
+name = "helm"
+mise_id = "aqua:helm/helm"
+description = "Kubernetes package manager"
+
+[[tool]]
+name = "k9s"
+mise_id = "aqua:derailed/k9s"
+description = "Kubernetes CLI to manage clusters in style"
+
+[[tool]]
+name = "flux"
+mise_id = "aqua:fluxcd/flux2"
+description = "GitOps toolkit for Kubernetes"
+
+[[tool]]
+name = "argocd"
+mise_id = "aqua:argoproj/argo-cd"
+description = "Declarative GitOps CD for Kubernetes"
+
+[[tool]]
+name = "docker-compose"
+mise_id = "aqua:docker/compose"
+description = "Define and run multi-container Docker applications"
+
+[[tool]]
+name = "podman"
+mise_id = "aqua:containers/podman"
+description = "Daemonless container engine for OCI containers"
+
+[[tool]]
+name = "skopeo"
+mise_id = "aqua:containers/skopeo"
+description = "Work with remote container image registries"
+
+[[tool]]
+name = "aws-cli"
+mise_id = "aqua:aws/aws-cli"
+description = "AWS Command Line Interface"
+
+[[tool]]
+name = "gcloud"
+mise_id = "aqua:GoogleCloudPlatform/cloud-sdk-docker"
+description = "Google Cloud SDK command-line interface"
+
+[[tool]]
+name = "action-validator"
+mise_id = "aqua:mpalmer/action-validator"
+description = "Validate GitHub Actions workflow files"
+
+[[tool]]
+name = "actionlint"
+mise_id = "aqua:rhysd/actionlint"
+description = "Static checker for GitHub Actions workflow files"
+
+[[tool]]
+name = "shellcheck"
+mise_id = "aqua:koalaman/shellcheck"
+description = "Shell script static analysis tool"
+
+[[tool]]
+name = "shfmt"
+mise_id = "aqua:mvdan/sh"
+description = "Shell parser, formatter, and interpreter"
+
+[[tool]]
+name = "golangci-lint"
+mise_id = "aqua:golangci/golangci-lint"
+description = "Fast Go linters runner"
+
+[[tool]]
+name = "hadolint"
+mise_id = "aqua:hadolint/hadolint"
+description = "Dockerfile linter that validates best practices"
+
+[[tool]]
+name = "trivy"
+mise_id = "aqua:aquasecurity/trivy"
+description = "Comprehensive security scanner for containers and code"
+
+[[tool]]
+name = "age"
+mise_id = "aqua:FiloSottile/age"
+description = "Simple, modern, and secure encryption tool"
+
+[[tool]]
+name = "sops"
+mise_id = "aqua:getsops/sops"
+description = "Editor of encrypted files supporting YAML, JSON, ENV, INI"
+
+[[tool]]
+name = "pass"
+mise_id = "aqua:zx2c4/password-store"
+description = "The standard Unix password manager"
+
+[[tool]]
+name = "gnupg"
+mise_id = "aqua:gpg/gnupg"
+description = "GNU Privacy Guard — encryption and signing tool"
+
+[[tool]]
+name = "viddy"
+mise_id = "aqua:sachaos/viddy"
+description = "Modern watch command with history and pager"
+
+[[tool]]
+name = "navi"
+mise_id = "aqua:denisidoro/navi"
+description = "Interactive cheatsheet tool for the CLI"
+
+[[tool]]
+name = "tldr"
+mise_id = "aqua:isacikgoz/tldr"
+description = "Collaborative cheatsheets for console commands"
+
+[[tool]]
+name = "thefuck"
+mise_id = "pipx:thefuck"
+description = "Magnificent app that corrects your previous console command"
+
+[[tool]]
+name = "mcfly"
+mise_id = "aqua:cantino/mcfly"
+description = "Fly through your shell history with smart search"

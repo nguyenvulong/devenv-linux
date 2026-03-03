@@ -32,9 +32,10 @@ devenv-linux/
     ├── Cargo.lock
     └── src/
         ├── main.rs          # Entry point: headless mode (--all/CI=true), event loop, sudo pre-auth, install thread
-        ├── app.rs           # App state (component list, cursor, screen, Arc log/done/index)
-        ├── ui.rs            # Ratatui rendering (3 screens: Selection, Installing, Report)
-        ├── registry.rs      # Static list of all installable components + detection logic
+        ├── app.rs           # App state (component list, cursor, screen, search state, Arc log/done/index)
+        ├── ui.rs            # Ratatui rendering (4 screens: Selection, Installing, Report, Search)
+        ├── registry.rs      # Static list of all installable components + Group enum + detection logic
+        ├── manifest.rs      # Curated mise_registry.toml parser, fuzzy search, runtime fallback
         ├── sys.rs           # Shell helpers: run_cmd, run_cmd_streaming, check_command_exists, get_distro
         └── installer/
             ├── mod.rs       # pub mod declarations
@@ -68,8 +69,18 @@ devenv-linux/
 3. **TUI selection screen (`ui.rs` + `app.rs`)**
    - On startup `App::new()` calls `sys::check_command_exists()` on every component
    - Already-installed tools default to `Unselected`; existing configs default to `KeepAsIs`
-   - Keyboard: `↑/↓` or `j/k` — navigate · `Space` — toggle · `a/n` — select all/none · `Enter` — start · `q` — quit
-   - Config toggling cycles: `Selected ➜ KeepAsIs ➜ Unselected`
+| Group | Items | Icon |
+|-------|-------|------|
+| `System` | Base Dependencies, Tmux | 🖥️ |
+| `Shells` | Fish Shell, Nushell | 🐚 |
+| `Editor` | Neovim | ✏️ |
+| `Languages` | Rust, Node.js, Go, Python (uv) | 🛠️ |
+| `CliTools` | fzf, ripgrep, fd, bat, eza, glow, jaq | 🔧 |
+| `Configurations` | fish config, nushell env.nu, oh-my-tmux, LazyVim | ⚙️ |
+| `ExtraTools` | Dynamically added via Search screen | 📦 |
+
+  - `app.cursor` indexes into `app.components` only (Option A: headers are purely visual)
+  - Keyboard: `↑/↓` or `j/k` — navigate · `Space` — toggle · `a/n` — select all/none · `/` — open search · `Enter` — start · `q` — quit
 
 4. **Installation thread (`main.rs:spawn_installation`)**
    - Runs on a **background thread** so the Ratatui event loop stays responsive
@@ -81,8 +92,50 @@ devenv-linux/
    | Phase | Index | Handler | What it does |
    |-------|-------|---------|--------------|
    | System Packages | 0 | `installer::system` | `sudo apt/pacman/dnf install` base-deps + tmux |
-   | Mise Tools | 1 | `installer::mise` | Self-installs `mise`, then `mise use -g <tools>@latest` |
-   | Configurations | 2 | `installer::config` | Fish config, Nushell `env.nu`, oh-my-tmux, LazyVim + OSC52 |
+1.  **Bootstrap (`install.sh`)**
+    -   Installs minimal system deps (curl, git, gcc) if missing
+    -   Installs `rustup` if `cargo` is not available
+    -   Runs `cargo build --release` inside `installer/`
+    -   Executes `./installer/target/release/installer "$@"` (forwarding any flags, e.g. `--all`)
+
+2.  **Headless / non-interactive mode (`main.rs:run_headless`)**
+    -   Activated by `--all` CLI flag, `CI=true`, or `INSTALLER_ALL=1` env var
+    -   Skips the TUI entirely — force-selects every component, runs all three phases, prints to stdout
+    -   Safe to run in CI containers with no TTY
+
+3.  **Pre-TUI phase (`main.rs`)**
+    -   Detects if any `SystemPackage` components are selected
+    -   If so, runs **`sudo -v` in normal terminal mode** (before `enable_raw_mode`) so the password prompt is visible
+    -   Spawns a background thread that re-runs `sudo -v` every 50 s to keep credentials cached throughout long installs
+
+3.  **TUI selection screen (`ui.rs` + `app.rs`)**
+    -   On startup `App::new()` calls `sys::check_command_exists()` on every component
+    -   Already-installed tools default to `Unselected`; existing configs default to `KeepAsIs`
+    | Group | Items | Icon |
+    |-------|-------|------|
+    | `System` | Base Dependencies, Tmux | 🖥️ |
+    | `Shells` | Fish Shell, Nushell | 🐚 |
+    | `Editor` | Neovim | ✏️ |
+    | `Languages` | Rust, Node.js, Go, Python (uv) | 🛠️ |
+    | `CliTools` | fzf, ripgrep, fd, bat, eza, glow, jaq | 🔧 |
+    | `Configurations` | fish config, nushell env.nu, oh-my-tmux, LazyVim | ⚙️ |
+    | `ExtraTools` | Dynamically added via Search screen | 📦 |
+
+    -   `app.cursor` indexes into `app.components` only (Option A: headers are purely visual)
+    -   Keyboard: `↑/↓` or `j/k` — navigate · `Space` — toggle · `a/n` — select all/none · `/` — open search · `Enter` — start · `q` — quit
+
+4.  **Installation thread (`main.rs:spawn_installation`)**
+    -   Runs on a **background thread** so the Ratatui event loop stays responsive
+    -   Writes log lines into `Arc<Mutex<Vec<String>>>` (shared with the UI)
+    -   Updates `Arc<Mutex<usize>> install_index` to drive the progress gauge (3 phases)
+    -   Sets `Arc<Mutex<bool>> install_done = true` when finished → UI switches to Report screen
+
+5.  **Three installation phases**
+    | Phase | Index | Handler | What it does |
+    |-------|-------|---------|--------------|
+    | System Packages | 0 | `installer::system` | `sudo apt/pacman/dnf install` base-deps + tmux |
+    | Mise Tools | 1 | `installer::mise` | Self-installs `mise`, then `mise use -g <tools>` |
+    | Configurations | 2 | `installer::config` | Fish config, Nushell `env.nu`, oh-my-tmux, LazyVim + OSC52 |
 
 ### Tool Categories (`registry.rs`)
 
@@ -92,12 +145,18 @@ devenv-linux/
 | `SystemPackage` | requires sudo | base-deps (build-essential etc.), tmux |
 | `Config` | bash git/file ops | fish config (with mise shims PATH), nushell `env.nu` (mise shims PATH), oh-my-tmux, LazyVim + OSC52 |
 
+### Search Screen
+
+-   Triggered by `/` on the Selection screen
+-   Searches `mise_registry.toml` (100 curated tools, embedded at compile time)
+-   If mise is already installed, merges in full `mise registry` output as fallback (deduplicated)
+-   `Enter` on a result adds a new `Mise` component in the `ExtraTools` group to the install list
+-   Deduplicates: adding the same tool twice is a no-op
+
 All tools that previously used hand-rolled GitHub release downloads have been replaced with `mise`. No direct download code exists anymore.
 
 ### Key Design Rules
 
-- `.rs` files must stay **< 500 lines** — split into modules if approaching this limit
-- Every module has a **single responsibility** (see directory structure above)
 - Sudo calls are **never made from within the TUI** — only pre-authenticated credentials are used
 - Installation is **non-destructive**: configs are backed up (e.g. `~/.config/nvim.bak`) before overwriting
 - Tests (`cargo test`) must pass before merging
@@ -160,7 +219,11 @@ Commits should follow Conventional Commits format: `feat:`, `fix:`, `chore:`, `d
 ## Changelog
 
 | Date | Change |
-|------|---------|
+|------|--------|
+| 2026-03-03 | Reorganize TUI selection screen into labeled groups: System, Shells, Editor, Languages, CLI Tools, Configurations |
+| 2026-03-03 | Add `/` search screen: fuzzy search over 100-tool curated manifest + runtime `mise registry` fallback |
+| 2026-03-03 | Add `Group` enum to `registry.rs`; add `manifest.rs` + `mise_registry.toml` (embedded at compile time) |
+| 2026-03-03 | Update help bar in TUI with full shortcut guide including new `/` shortcut |
 | 2026-03-02 | Replace monolithic `install.sh` (712 lines) with Ratatui TUI installer (`installer/`) |
 | 2026-03-02 | Move all tool installs to `mise`; eliminate all direct GitHub release downloads |
 | 2026-03-02 | Fix sudo TTY issue: pre-authenticate before TUI, run installation on background thread |

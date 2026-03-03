@@ -15,6 +15,7 @@ use std::{
 
 mod app;
 mod installer;
+mod manifest;
 mod registry;
 mod sys;
 mod ui;
@@ -203,11 +204,7 @@ where
                         KeyCode::Char(' ') => app.toggle_selection(),
                         KeyCode::Char('a') => {
                             for c in &mut app.components {
-                                c.state = if matches!(c.category, registry::Category::Config) {
-                                    registry::SelectionState::Selected
-                                } else {
-                                    registry::SelectionState::Selected
-                                };
+                                c.state = registry::SelectionState::Selected;
                             }
                         }
                         KeyCode::Char('n') => {
@@ -215,9 +212,32 @@ where
                                 c.state = registry::SelectionState::Unselected;
                             }
                         }
+                        KeyCode::Char('/') => {
+                            app.search_query.clear();
+                            app.update_search();
+                            app.screen = Screen::Search;
+                        }
                         KeyCode::Enter => {
                             app.screen = Screen::Installing;
                             spawn_installation(app);
+                        }
+                        _ => {}
+                    },
+                    Screen::Search => match key.code {
+                        KeyCode::Esc => app.screen = Screen::Selection,
+                        KeyCode::Up | KeyCode::Char('k') => app.search_previous(),
+                        KeyCode::Down | KeyCode::Char('j') => app.search_next(),
+                        KeyCode::Enter => {
+                            app.add_search_result();
+                            app.screen = Screen::Selection;
+                        }
+                        KeyCode::Backspace => {
+                            app.search_query.pop();
+                            app.update_search();
+                        }
+                        KeyCode::Char(c) => {
+                            app.search_query.push(c);
+                            app.update_search();
                         }
                         _ => {}
                     },
