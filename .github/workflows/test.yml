@@ -57,20 +57,37 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ── Build + run the Ratatui installer ──────────────────────────────────
-      # install.sh handles rustup + cargo build, then launches the installer.
+      # ── Install Rust (needed to compile the installer in CI) ───────────────
+      # The release workflow publishes pre-built binaries for end-users.
+      # The test workflow always compiles from source to validate the code.
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      # ── Build the devenv binary ────────────────────────────────────────────
+      - name: Build devenv (as user)
+        if: ${{ !matrix.run_as_root }}
+        run: |
+          chown -R testuser:testuser .
+          su - testuser -c "cd $(pwd)/installer && cargo build --release"
+        shell: bash
+
+      - name: Build devenv (as root)
+        if: ${{ matrix.run_as_root }}
+        run: cargo build --release
+        working-directory: installer
+
+      # ── Run the installer in headless mode ─────────────────────────────────
       # --all forces headless mode: selects all components, no TUI, no TTY needed.
 
       - name: Run installer (as user)
         if: ${{ !matrix.run_as_root }}
         run: |
-          chown -R testuser:testuser .
-          su - testuser -c "cd $(pwd) && bash install.sh --all"
+          su - testuser -c "cd $(pwd) && installer/target/release/devenv --all"
         shell: bash
 
       - name: Run installer (as root)
         if: ${{ matrix.run_as_root }}
-        run: bash install.sh --all
+        run: installer/target/release/devenv --all
         shell: bash
 
       # ── Verify tools ──────────────────────────────────────────────────────
