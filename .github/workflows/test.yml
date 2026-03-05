@@ -57,22 +57,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ── Install Rust (needed to compile the installer in CI) ───────────────
-      # The release workflow publishes pre-built binaries for end-users.
-      # The test workflow always compiles from source to validate the code.
+      # ── Install Rust and build the devenv binary ───────────────────────────
+      # Always build as the Actions runner (root/runner) who owns the cargo
+      # installation from dtolnay/rust-toolchain. The compiled binary is then
+      # handed to testuser to run — avoiding 'cargo: command not found' inside
+      # `su - testuser -c` which spawns a login shell with a different $PATH.
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      # ── Build the devenv binary ────────────────────────────────────────────
-      - name: Build devenv (as user)
-        if: ${{ !matrix.run_as_root }}
-        run: |
-          chown -R testuser:testuser .
-          su - testuser -c "cd $(pwd)/installer && cargo build --release"
-        shell: bash
-
-      - name: Build devenv (as root)
-        if: ${{ matrix.run_as_root }}
+      - name: Build devenv
         run: cargo build --release
         working-directory: installer
 
@@ -82,7 +75,8 @@ jobs:
       - name: Run installer (as user)
         if: ${{ !matrix.run_as_root }}
         run: |
-          su - testuser -c "cd $(pwd) && installer/target/release/devenv --all"
+          chown -R testuser:testuser .
+          su - testuser -c "$(pwd)/installer/target/release/devenv --all"
         shell: bash
 
       - name: Run installer (as root)
