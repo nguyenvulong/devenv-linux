@@ -21,12 +21,13 @@ It installs a curated set of CLI tools, programming language toolchains, shells,
 
 ```
 devenv-linux/
-├── install.sh               # Bootstrap: installs Rust, builds the TUI, launches it
+├── install.sh               # Bootstrap: detects arch, downloads latest release binary, runs it
 ├── AGENT.md                 # ← You are here
 ├── README.md
 ├── .github/
 │   └── workflows/
-│       └── test.yml         # CI: matrix test across Ubuntu, Debian, Fedora, Arch via Docker
+│       ├── test.yml         # CI: matrix test across Ubuntu, Debian, Fedora, Arch via Docker
+│       └── release.yml      # CD: cross-compile musl binaries + publish GitHub Release on v* tag
 └── installer/               # Rust TUI project
     ├── Cargo.toml
     ├── Cargo.lock
@@ -51,10 +52,11 @@ devenv-linux/
 ### How the Installer Works
 
 1. **Bootstrap (`install.sh`)**
-   - Installs minimal system deps (curl, git, gcc) if missing
-   - Installs `rustup` if `cargo` is not available
-   - Runs `cargo build --release` inside `installer/`
-   - Executes `./installer/target/release/installer "$@"` (forwarding any flags, e.g. `--all`)
+   - Detects CPU architecture (`uname -m` → `x86_64` or `aarch64`)
+   - Fetches the latest release tag from the GitHub API
+   - Downloads `devenv-{version}-{arch}.tar.xz` from GitHub Releases
+   - Extracts to a tmp directory and `exec`s `./devenv "$@"`
+   - No Rust toolchain required on the user's machine
 
 2. **Headless / non-interactive mode (`main.rs:run_headless`)**
    - Activated by `--all` CLI flag, `CI=true`, or `INSTALLER_ALL=1` env var
@@ -93,10 +95,11 @@ devenv-linux/
    |-------|-------|---------|--------------|
    | System Packages | 0 | `installer::system` | `sudo apt/pacman/dnf install` base-deps + tmux |
 1.  **Bootstrap (`install.sh`)**
-    -   Installs minimal system deps (curl, git, gcc) if missing
-    -   Installs `rustup` if `cargo` is not available
-    -   Runs `cargo build --release` inside `installer/`
-    -   Executes `./installer/target/release/installer "$@"` (forwarding any flags, e.g. `--all`)
+    -   Detects CPU architecture (`uname -m` → `x86_64` or `aarch64`)
+    -   Fetches the latest release tag from the GitHub API
+    -   Downloads `devenv-{version}-{arch}.tar.xz` from GitHub Releases
+    -   Extracts to a tmp directory and `exec`s `./devenv "$@"`
+    -   No Rust toolchain required on the user's machine
 
 2.  **Headless / non-interactive mode (`main.rs:run_headless`)**
     -   Activated by `--all` CLI flag, `CI=true`, or `INSTALLER_ALL=1` env var
@@ -194,7 +197,7 @@ Runs on push/PR to `dev` branch. Tests across 4 containers:
 bash install.sh
 
 # Build and run TUI directly
-cd installer && cargo build --release && ./target/release/installer
+cd installer && cargo build --release && ./target/release/devenv
 
 # Quick compile check
 cd installer && cargo check
@@ -235,3 +238,7 @@ Commits should follow Conventional Commits format: `feat:`, `fix:`, `chore:`, `d
 | 2026-03-03 | Remove unused `InstallStatus` variants and `check_args` field; prefix `_stdout` to silence dead code warnings |
 | 2026-03-03 | Implement version detection using `mise ls` and standard command versions, display in TUI |
 | 2026-03-03 | Remove unused `ureq`, `semver`, and `serde` crates from `Cargo.toml` |
+| 2026-03-05 | Rename binary from `installer` to `devenv` in `Cargo.toml` |
+| 2026-03-05 | Add `.github/workflows/release.yml`: cross-compile musl binaries for x86_64 + aarch64, publish GitHub Release on `v*` tag or `workflow_dispatch` |
+| 2026-03-05 | Rewrite `install.sh` as thin download bootstrap (~60 lines): detects arch, downloads release binary, no Rust required |
+| 2026-03-05 | Update `README.md` with `curl \| tar` one-liner quick start and supported architectures table |
