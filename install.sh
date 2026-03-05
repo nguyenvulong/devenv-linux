@@ -1,50 +1,64 @@
 #!/usr/bin/env bash
+# install.sh — thin bootstrap that downloads and runs the latest devenv release.
+# Source: https://github.com/nguyenvulong/devenv-linux
 
-set -e
+set -euo pipefail
 
-# Colors for output
+REPO="nguyenvulong/devenv-linux"
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-echo -e "${BLUE}Bootstrapping devenv-linux interactive installer...${NC}"
+# ── Detect architecture ───────────────────────────────────────────────────────
+ARCH=$(uname -m)
+case "$ARCH" in
+  x86_64)  ARCH_LABEL="x86_64" ;;
+  aarch64) ARCH_LABEL="aarch64" ;;
+  arm64)   ARCH_LABEL="aarch64" ;;  # macOS arm64 alias
+  *)
+    echo -e "${RED}Unsupported architecture: $ARCH${NC}"
+    echo "Pre-built binaries are available for x86_64 and aarch64 only."
+    exit 1
+    ;;
+esac
 
-# 1. Install minimal dependencies to build rust
-if [ -f /etc/os-release ]; then
-  . /etc/os-release
-  if [[ "$ID" == "debian" || "$ID" == "ubuntu" || "$ID_LIKE" == *"debian"* ]]; then
-    echo -e "${BLUE}Debian/Ubuntu detected, updating and checking base packages...${NC}"
-    if ! dpkg -s build-essential curl git unzip tar >/dev/null 2>&1; then
-      sudo apt-get update
-      sudo apt-get install -y build-essential curl git unzip tar
-    fi
-  elif [[ "$ID" == "arch" || "$ID_LIKE" == *"arch"* ]]; then
-    echo -e "${BLUE}Arch Linux detected, checking base packages...${NC}"
-    if ! pacman -Qi base-devel curl git unzip tar >/dev/null 2>&1; then
-      sudo pacman -Sy --noconfirm base-devel curl git unzip tar
-    fi
-  elif [[ "$ID" == "fedora" || "$ID" == "centos" || "$ID_LIKE" == *"fedora"* || "$ID_LIKE" == *"centos"* ]]; then
-    echo -e "${BLUE}RedHat-family Linux detected, checking base packages...${NC}"
-    if ! rpm -q gcc gcc-c++ make curl git unzip tar >/dev/null 2>&1; then
-      sudo dnf install -y gcc gcc-c++ make curl git unzip tar
-    fi
-  fi
+# ── Fetch latest release version ─────────────────────────────────────────────
+echo -e "${BLUE}Fetching latest devenv release...${NC}"
+if command -v curl &>/dev/null; then
+  VERSION=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
+    | grep '"tag_name"' | sed 's/.*"v\([^"]*\)".*/\1/')
+elif command -v wget &>/dev/null; then
+  VERSION=$(wget -qO- "https://api.github.com/repos/${REPO}/releases/latest" \
+    | grep '"tag_name"' | sed 's/.*"v\([^"]*\)".*/\1/')
+else
+  echo -e "${RED}Neither curl nor wget found. Install one and try again.${NC}"
+  exit 1
 fi
 
-# 2. Check for rust
-if ! command -v cargo &> /dev/null; then
-  echo -e "${BLUE}Cargo not found. Installing Rust via rustup...${NC}"
-  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-  source "$HOME/.cargo/env"
+if [ -z "$VERSION" ]; then
+  echo -e "${RED}Could not determine latest release version. Check your internet connection.${NC}"
+  exit 1
 fi
 
-# 3. Build the installer
-echo -e "${BLUE}Building the interactive installer...${NC}"
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-cd "$DIR/installer"
-cargo build --release
+echo -e "${BLUE}Latest version: v${VERSION}${NC}"
 
-# 4. Run the installer
-echo -e "${GREEN}Starting the installer...${NC}"
-./target/release/installer "$@"
+# ── Download and extract ──────────────────────────────────────────────────────
+ARCHIVE="devenv-${VERSION}-${ARCH_LABEL}.tar.xz"
+URL="https://github.com/${REPO}/releases/download/v${VERSION}/${ARCHIVE}"
+TMPDIR=$(mktemp -d)
+trap 'rm -rf "$TMPDIR"' EXIT
+
+echo -e "${BLUE}Downloading ${ARCHIVE}...${NC}"
+if command -v curl &>/dev/null; then
+  curl -fsSL "$URL" -o "${TMPDIR}/${ARCHIVE}"
+else
+  wget -qO "${TMPDIR}/${ARCHIVE}" "$URL"
+fi
+
+tar -xJf "${TMPDIR}/${ARCHIVE}" -C "$TMPDIR"
+chmod +x "${TMPDIR}/devenv"
+
+# ── Run the installer ─────────────────────────────────────────────────────────
+echo -e "${GREEN}Launching devenv v${VERSION}...${NC}"
+exec "${TMPDIR}/devenv" "$@"

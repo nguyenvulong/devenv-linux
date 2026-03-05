@@ -1,0 +1,131 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. 0.1.0 — must match Cargo.toml)'
+        required: true
+
+jobs:
+  # ── Validate that the tag matches Cargo.toml version (tag pushes only) ──────
+  validate:
+    name: Validate version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract Cargo.toml version
+        id: cargo_version
+        run: |
+          VERSION=$(grep '^version' installer/Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          echo "cargo_version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Determine release version
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            # Strip leading 'v' from tag name
+            TAG="${GITHUB_REF_NAME#v}"
+            echo "version=$TAG" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate tag matches Cargo.toml (tag pushes only)
+        if: github.event_name == 'push'
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          CARGO_VERSION="${{ steps.cargo_version.outputs.cargo_version }}"
+          if [ "$TAG_VERSION" != "$CARGO_VERSION" ]; then
+            echo "ERROR: Tag version ($TAG_VERSION) does not match Cargo.toml version ($CARGO_VERSION)"
+            echo "Please update installer/Cargo.toml version to $TAG_VERSION before tagging."
+            exit 1
+          fi
+          echo "✅ Tag v$TAG_VERSION matches Cargo.toml version $CARGO_VERSION"
+
+  # ── Build release binaries ──────────────────────────────────────────────────
+  build:
+    name: Build ${{ matrix.arch }}
+    needs: validate
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - arch: x86_64
+            target: x86_64-unknown-linux-musl
+          - arch: aarch64
+            target: aarch64-unknown-linux-musl
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable with musl target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cross
+        run: cargo install cross --git https://github.com/cross-rs/cross --locked
+
+      - name: Build with cross
+        run: cross build --release --target ${{ matrix.target }}
+        working-directory: installer
+
+      - name: Package archive
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+          ARCH="${{ matrix.arch }}"
+          BINARY="installer/target/${{ matrix.target }}/release/devenv"
+          ARCHIVE="devenv-${VERSION}-${ARCH}.tar.xz"
+
+          cp "$BINARY" devenv
+          tar -cJf "$ARCHIVE" devenv
+          rm devenv
+
+          echo "ARCHIVE=$ARCHIVE" >> "$GITHUB_ENV"
+          echo "Packaged: $ARCHIVE ($(du -sh "$ARCHIVE" | cut -f1))"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: devenv-${{ matrix.arch }}
+          path: devenv-${{ needs.validate.outputs.version }}-${{ matrix.arch }}.tar.xz
+          if-no-files-found: error
+
+  # ── Publish GitHub Release ──────────────────────────────────────────────────
+  release:
+    name: Publish release
+    needs: [validate, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+          merge-multiple: true
+
+      - name: List assets
+        run: ls -lh dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: v${{ needs.validate.outputs.version }}
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', needs.validate.outputs.version) || github.ref_name }}
+          draft: ${{ github.event_name == 'workflow_dispatch' }}
+          generate_release_notes: true
+          files: |
+            dist/devenv-${{ needs.validate.outputs.version }}-x86_64.tar.xz
+            dist/devenv-${{ needs.validate.outputs.version }}-aarch64.tar.xz
