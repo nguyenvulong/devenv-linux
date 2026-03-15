@@ -301,7 +301,7 @@ fn draw_search(f: &mut Frame, app: &mut App) {
     // Help bar
     let help = Paragraph::new(Line::from(vec![
         Span::styled(" Navigate ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-        Span::raw("↑/↓  j/k   "),
+        Span::raw("↑/↓   "),
         Span::styled(" Add to list ", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
         Span::raw("<Enter>   "),
         Span::styled(" Back ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
