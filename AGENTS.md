@@ -223,6 +223,7 @@ Commits should follow Conventional Commits format: `feat:`, `fix:`, `chore:`, `d
 
 | Date | Change |
 |------|--------|
+| 2026-03-15 | Update GitHub Actions workflows to use `actions/checkout@v5` for Node.js 24 compatibility |
 | 2026-03-15 | Fix Search screen keybinding conflict: `j`/`k` no longer hijack query typing; Search navigation now uses arrow keys only |
 | 2026-03-03 | Reorganize TUI selection screen into labeled groups: System, Shells, Editor, Languages, CLI Tools, Configurations |
 | 2026-03-03 | Add `/` search screen: fuzzy search over 100-tool curated manifest + runtime `mise registry` fallback |

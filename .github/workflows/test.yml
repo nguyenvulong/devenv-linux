@@ -55,7 +55,7 @@ jobs:
           chmod 0440 /etc/sudoers.d/testuser
 
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # ── Install Rust and build the devenv binary ───────────────────────────
       # Always build as the Actions runner (root/runner) who owns the cargo
