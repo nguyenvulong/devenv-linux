@@ -225,8 +225,9 @@ where
                     },
                     Screen::Search => match key.code {
                         KeyCode::Esc => app.screen = Screen::Selection,
-                        KeyCode::Up | KeyCode::Char('k') => app.search_previous(),
-                        KeyCode::Down | KeyCode::Char('j') => app.search_next(),
+                        // In search mode, keep plain character keys for query input.
+                        KeyCode::Up => app.search_previous(),
+                        KeyCode::Down => app.search_next(),
                         KeyCode::Enter => {
                             app.add_search_result();
                             app.screen = Screen::Selection;
