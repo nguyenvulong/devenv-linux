@@ -18,6 +18,7 @@ mod installer;
 mod manifest;
 mod registry;
 mod sys;
+mod theme;
 mod ui;
 
 use app::{App, Screen};
