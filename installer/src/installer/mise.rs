@@ -1,4 +1,4 @@
-use crate::registry::{Component, Category};
+use crate::registry::{Category, Component};
 use crate::sys::run_cmd_streaming;
 use std::fs;
 
@@ -23,7 +23,7 @@ where
 
 /// Resolve the path to the mise binary.
 /// mise installs itself to ~/.local/bin/mise, which may not be on PATH yet.
-fn mise_bin() -> String {
+pub fn mise_bin() -> String {
     if crate::sys::check_command_exists("mise") {
         return "mise".to_string();
     }
@@ -54,14 +54,14 @@ where
             let tool_spec = format!("{}@latest", plugin);
             log(&format!("Installing: mise use -g {}", tool_spec));
 
-            let result = run_cmd_streaming(
-                &mise,
-                &["use", "-g", &tool_spec],
-                log.clone(),
-            );
+            let result = run_cmd_streaming(&mise, &["use", "-g", &tool_spec], log.clone());
 
             if !result.success {
-                log(&format!("[WARN] Failed to install {}: {}", plugin, result.stderr.trim()));
+                log(&format!(
+                    "[WARN] Failed to install {}: {}",
+                    plugin,
+                    result.stderr.trim()
+                ));
                 any_error = true;
                 // Continue — don't abort the loop for one bad tool.
             }

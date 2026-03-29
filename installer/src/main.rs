@@ -29,7 +29,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Skips the TUI entirely — useful for CI pipelines and scripted installs.
     let headless = std::env::args().any(|a| a == "--all")
         || std::env::var("CI").map(|v| v == "true").unwrap_or(false)
-        || std::env::var("INSTALLER_ALL").map(|v| v == "1").unwrap_or(false);
+        || std::env::var("INSTALLER_ALL")
+            .map(|v| v == "1")
+            .unwrap_or(false);
 
     if headless {
         return run_headless();
@@ -67,6 +69,17 @@ fn main() -> Result<(), Box<dyn Error>> {
             thread::sleep(Duration::from_secs(50));
             let _ = Command::new("sudo").arg("-v").output();
         });
+    }
+
+    // ── Pre-flight: Ensure mise is installed for full registry search ────────
+    // This allows `load_runtime_registry` to dynamically find packages
+    // on the first launch.
+    if !sys::check_command_exists("mise") {
+        let mise_path = installer::mise::mise_bin();
+        if mise_path == "mise" {
+            println!("Setting up package registry (installing mise)...");
+            let _ = installer::mise::install_mise(|_| {});
+        }
     }
 
     // ── Enter the TUI ────────────────────────────────────────────────────────
@@ -155,10 +168,7 @@ fn run_headless() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn run_app<B: Backend>(
-    terminal: &mut Terminal<B>,
-    app: &mut App,
-) -> Result<(), Box<dyn Error>>
+fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<(), Box<dyn Error>>
 where
     <B as Backend>::Error: 'static,
 {
@@ -322,10 +332,9 @@ fn spawn_installation(app: &mut App) {
                     }
                 }
                 Ok(()) => {
-                    if let Err(e) = installer::mise::activate_mise_tools(
-                        &mise_comps,
-                        make_log(logs.clone()),
-                    ) {
+                    if let Err(e) =
+                        installer::mise::activate_mise_tools(&mise_comps, make_log(logs.clone()))
+                    {
                         if let Ok(mut g) = logs.lock() {
                             g.push(format!("[ERROR] mise tools: {}", e));
                         }

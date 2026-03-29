@@ -14,13 +14,13 @@ pub enum Group {
 impl Group {
     pub fn label(&self) -> &'static str {
         match self {
-            Group::System         => "🖥️  System",
-            Group::Shells         => "🐚  Shells",
-            Group::Editor         => "✏️  Editor",
-            Group::Languages      => "🛠️  Languages",
-            Group::CliTools       => "🔧  CLI Tools",
+            Group::System => "🖥️  System",
+            Group::Shells => "🐚  Shells",
+            Group::Editor => "✏️  Editor",
+            Group::Languages => "🛠️  Languages",
+            Group::CliTools => "🔧  CLI Tools",
             Group::Configurations => "⚙️  Configurations",
-            Group::ExtraTools     => "📦  Extra Tools",
+            Group::ExtraTools => "📦  Extra Tools",
         }
     }
 }
@@ -81,7 +81,7 @@ impl Component {
             group,
             check_command: check_command.map(|s| s.to_string()),
             check_args: check_args.iter().map(|&s| s.to_string()).collect(),
-            state: SelectionState::Selected,
+            state: SelectionState::Unselected,
             status: InstallStatus::Checking,
         }
     }
@@ -116,15 +116,6 @@ pub fn get_all_components() -> Vec<Component> {
             Category::Mise("aqua:fish-shell/fish-shell".to_string()),
             Group::Shells,
             Some("fish"),
-            &["--version"],
-        ),
-        Component::new(
-            "nushell",
-            "Nushell",
-            "A new type of shell",
-            Category::Mise("aqua:nushell/nushell".to_string()),
-            Group::Shells,
-            Some("nu"),
             &["--version"],
         ),
         // ── Editor ───────────────────────────────────────────────────────────
@@ -240,18 +231,18 @@ pub fn get_all_components() -> Vec<Component> {
         ),
         // ── Configurations ───────────────────────────────────────────────────
         Component::new(
-            "config-fish",
-            "Fish Configuration",
-            "Aliases, colors, mise paths",
+            "config-bash",
+            "Bash Configuration",
+            "Adds mise activation to ~/.bashrc",
             Category::Config,
             Group::Configurations,
             None,
             &[],
         ),
         Component::new(
-            "config-nushell",
-            "Nushell Configuration",
-            "Adds mise shims to PATH in env.nu",
+            "config-fish",
+            "Fish Configuration",
+            "Aliases, colors, mise paths",
             Category::Config,
             Group::Configurations,
             None,

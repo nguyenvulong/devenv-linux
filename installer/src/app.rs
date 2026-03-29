@@ -1,5 +1,7 @@
 use crate::manifest::{self, ManifestTool};
-use crate::registry::{get_all_components, Category, Component, Group, InstallStatus, SelectionState};
+use crate::registry::{
+    get_all_components, Category, Component, Group, InstallStatus, SelectionState,
+};
 use std::sync::{Arc, Mutex};
 
 #[derive(PartialEq, Eq)]
@@ -49,18 +51,13 @@ impl App {
                         "config-tmux" => {
                             std::path::Path::new(&format!("{}/.config/tmux", home)).exists()
                         }
-                        "config-fish" => std::path::Path::new(&format!(
-                            "{}/.config/fish/config.fish",
-                            home
-                        ))
-                        .exists(),
-                        "config-nushell" => {
-                            std::fs::read_to_string(format!(
-                                "{}/.config/nushell/env.nu",
-                                home
-                            ))
-                            .map(|s| s.contains(".local/share/mise/shims"))
-                            .unwrap_or(false)
+                        "config-bash" => std::fs::read_to_string(format!("{}/.bashrc", home))
+                            .map(|s| s.contains("mise activate bash"))
+                            .unwrap_or(false),
+                        "config-fish" => {
+                            std::fs::read_to_string(format!("{}/.config/fish/config.fish", home))
+                                .map(|s| s.contains("mise activate fish"))
+                                .unwrap_or(false)
                         }
                         _ => false,
                     };
@@ -81,11 +78,11 @@ impl App {
                             c.state = SelectionState::Unselected;
                             c.status = InstallStatus::Installed("Detected".to_string());
                         } else {
-                            c.state = SelectionState::Selected;
+                            c.state = SelectionState::Unselected;
                             c.status = InstallStatus::NotInstalled;
                         }
                     } else {
-                        c.state = SelectionState::Selected;
+                        c.state = SelectionState::Unselected;
                         c.status = InstallStatus::NotInstalled;
                     }
                 }
@@ -95,9 +92,7 @@ impl App {
                             c.state = SelectionState::Unselected;
                             let args: Vec<&str> = c.check_args.iter().map(|s| s.as_str()).collect();
                             if !args.is_empty() {
-                                if let Some(version) =
-                                    crate::sys::get_command_version(cmd, &args)
-                                {
+                                if let Some(version) = crate::sys::get_command_version(cmd, &args) {
                                     c.status = InstallStatus::Installed(version);
                                 } else {
                                     c.status = InstallStatus::Installed("Detected".to_string());
@@ -106,11 +101,11 @@ impl App {
                                 c.status = InstallStatus::Installed("Detected".to_string());
                             }
                         } else {
-                            c.state = SelectionState::Selected;
+                            c.state = SelectionState::Unselected;
                             c.status = InstallStatus::NotInstalled;
                         }
                     } else {
-                        c.state = SelectionState::Selected;
+                        c.state = SelectionState::Unselected;
                         c.status = InstallStatus::NotInstalled;
                     }
                 }
@@ -200,9 +195,10 @@ impl App {
         };
 
         // Dedup: skip if a component with the same mise_id already exists.
-        let already_exists = self.components.iter().any(|c| {
-            matches!(&c.category, Category::Mise(id) if id == &tool.mise_id)
-        });
+        let already_exists = self
+            .components
+            .iter()
+            .any(|c| matches!(&c.category, Category::Mise(id) if id == &tool.mise_id));
         if already_exists {
             return;
         }
@@ -225,7 +221,7 @@ impl App {
             new_comp.state = SelectionState::Unselected;
             new_comp.status = InstallStatus::Installed("Detected".to_string());
         } else {
-            new_comp.state = SelectionState::Selected;
+            new_comp.state = SelectionState::Unselected;
             new_comp.status = InstallStatus::NotInstalled;
         }
 

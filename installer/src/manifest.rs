@@ -27,10 +27,7 @@ pub fn search(tools: &[ManifestTool], query: &str) -> Vec<ManifestTool> {
     let q = query.to_lowercase();
     tools
         .iter()
-        .filter(|t| {
-            t.name.to_lowercase().contains(&q)
-                || t.description.to_lowercase().contains(&q)
-        })
+        .filter(|t| t.name.to_lowercase().contains(&q) || t.description.to_lowercase().contains(&q))
         .cloned()
         .collect()
 }
@@ -38,7 +35,8 @@ pub fn search(tools: &[ManifestTool], query: &str) -> Vec<ManifestTool> {
 /// Runtime fallback: query `mise registry` if mise is already installed.
 /// Merges results with the curated manifest (deduplicates by mise_id).
 pub fn load_runtime_registry() -> Option<Vec<ManifestTool>> {
-    let output = std::process::Command::new("mise")
+    let mise_bin = crate::installer::mise::mise_bin();
+    let output = std::process::Command::new(mise_bin)
         .args(["registry"])
         .output()
         .ok()?;

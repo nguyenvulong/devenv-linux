@@ -38,7 +38,7 @@ where
     // Use channels or just log synchronously from one standard output while the other is in a thread
     let (tx, rx) = std::sync::mpsc::channel();
     let tx_err = tx.clone();
-    
+
     // Read stdout
     let stdout_thread = thread::spawn(move || {
         let mut stdout_str = String::new();
@@ -73,7 +73,7 @@ where
     }
 
     let status = child.wait().unwrap();
-    
+
     CommandResult {
         success: status.success(),
         _stdout: stdout_thread.join().unwrap(),
@@ -86,8 +86,7 @@ where
 pub fn check_command_exists(cmd: &str) -> bool {
     // Also check the mise shims dir explicitly, since it may not be on PATH yet.
     let home = std::env::var("HOME").unwrap_or_default();
-    let mise_shims = std::path::PathBuf::from(&home)
-        .join(".local/share/mise/shims");
+    let mise_shims = std::path::PathBuf::from(&home).join(".local/share/mise/shims");
 
     let path_var = std::env::var("PATH").unwrap_or_default();
     let mut dirs: Vec<std::path::PathBuf> = std::env::split_paths(&path_var).collect();
@@ -101,11 +100,18 @@ pub fn check_command_exists(cmd: &str) -> bool {
 
 pub fn get_distro() -> String {
     let os_release = std::fs::read_to_string("/etc/os-release").unwrap_or_default();
-    if os_release.contains("ID=debian") || os_release.contains("ID=ubuntu") || os_release.contains("ID_LIKE=debian") {
+    if os_release.contains("ID=debian")
+        || os_release.contains("ID=ubuntu")
+        || os_release.contains("ID_LIKE=debian")
+    {
         "debian".to_string()
     } else if os_release.contains("ID=arch") || os_release.contains("ID_LIKE=arch") {
         "arch".to_string()
-    } else if os_release.contains("ID=fedora") || os_release.contains("ID=centos") || os_release.contains("ID_LIKE=fedora") || os_release.contains("ID_LIKE=centos") {
+    } else if os_release.contains("ID=fedora")
+        || os_release.contains("ID=centos")
+        || os_release.contains("ID_LIKE=fedora")
+        || os_release.contains("ID_LIKE=centos")
+    {
         "redhat".to_string()
     } else {
         "unknown".to_string()
@@ -122,18 +128,15 @@ pub fn get_mise_tool_version(tool: &str) -> Option<String> {
     }
 
     // Call `mise ls <tool>` and parse its stdout.
-    // E.g., `mise ls rust` 
-    let out = Command::new("mise")
-        .args(["ls", tool])
-        .output()
-        .ok()?;
+    // E.g., `mise ls rust`
+    let out = Command::new("mise").args(["ls", tool]).output().ok()?;
 
     if !out.status.success() {
         return None; // Tool might not be known to mise yet.
     }
 
     let stdout = String::from_utf8_lossy(&out.stdout);
-    
+
     // The format is typically: <tool> <version> <source>
     // We want the first line that starts with the tool name, and extract the second column.
     for line in stdout.lines() {
@@ -147,7 +150,7 @@ pub fn get_mise_tool_version(tool: &str) -> Option<String> {
             }
         }
     }
-    
+
     None
 }
 
@@ -158,10 +161,7 @@ pub fn get_command_version(cmd: &str, args: &[&str]) -> Option<String> {
         return None;
     }
 
-    let out = Command::new(cmd)
-        .args(args)
-        .output()
-        .ok()?;
+    let out = Command::new(cmd).args(args).output().ok()?;
 
     if !out.status.success() {
         return None;
@@ -182,7 +182,11 @@ pub fn get_command_version(cmd: &str, args: &[&str]) -> Option<String> {
     for part in parts {
         // Find a string that looks like a version (starts with a digit or 'v' + digit)
         let clean_part = part.trim_start_matches('v'); // handle "v1.2.3"
-        if clean_part.chars().next().map_or(false, |c| c.is_ascii_digit()) {
+        if clean_part
+            .chars()
+            .next()
+            .map_or(false, |c| c.is_ascii_digit())
+        {
             return Some(clean_part.to_string());
         }
     }
@@ -195,4 +199,3 @@ pub fn get_command_version(cmd: &str, args: &[&str]) -> Option<String> {
         Some(fallback.to_string())
     }
 }
-

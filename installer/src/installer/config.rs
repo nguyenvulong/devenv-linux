@@ -1,5 +1,5 @@
 use crate::registry::{Component, SelectionState};
-use crate::sys::{run_cmd_streaming, run_cmd};
+use crate::sys::{run_cmd, run_cmd_streaming};
 use std::fs;
 use std::path::Path;
 
@@ -8,21 +8,72 @@ where
     F: FnMut(&str) + Send + 'static + Clone,
 {
     if component.state == SelectionState::KeepAsIs {
-        log(&format!("Skipping config {} (Keep as-is selected)", component.id));
+        log(&format!(
+            "Skipping config {} (Keep as-is selected)",
+            component.id
+        ));
         return Ok(());
     }
 
     let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
 
     match component.id.as_str() {
+        "config-bash" => {
+            let bashrc = format!("{}/.bashrc", home);
+            let mise_line = "eval \"$($HOME/.local/bin/mise activate bash)\"\n";
+
+            let already_set = if Path::new(&bashrc).exists() {
+                fs::read_to_string(&bashrc)
+                    .map(|s| s.contains("mise activate bash"))
+                    .unwrap_or(false)
+            } else {
+                false
+            };
+
+            if already_set {
+                log("Bash .bashrc already contains mise activation — skipping.");
+            } else {
+                log(&format!("Appending mise activation to {}", bashrc));
+                use std::io::Write;
+                let mut f = fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(&bashrc)
+                    .map_err(|e| format!("Failed to open {}: {}", bashrc, e))?;
+                writeln!(f, "\n# mise activation — added by devenv-linux installer").ok();
+                write!(f, "{}", mise_line)
+                    .map_err(|e| format!("Failed to write .bashrc: {}", e))?;
+            }
+            Ok(())
+        }
+
         "config-fish" => {
             let config_dir = format!("{}/.config/fish", home);
             fs::create_dir_all(&config_dir)
                 .map_err(|e| format!("Failed to create {}: {}", config_dir, e))?;
             let dest = format!("{}/config.fish", config_dir);
 
-            log("Writing generic fish config...");
-            let content = "
+            // If the file exists and has mise activation, skip rewriting it.
+            let already_set = if Path::new(&dest).exists() {
+                fs::read_to_string(&dest)
+                    .map(|s| s.contains("mise activate fish"))
+                    .unwrap_or(false)
+            } else {
+                false
+            };
+
+            if already_set {
+                log("Fish config.fish already contains mise activation — skipping.");
+                return Ok(());
+            }
+
+            let mise_line = "~/.local/bin/mise activate fish | source\n";
+
+            // If file doesn't exist, create it with the generic config, plus mise line.
+            // If it exists but doesn't have mise, just append mise line.
+            if !Path::new(&dest).exists() {
+                log("Writing generic fish config...");
+                let content = format!("
 # colors
 export LS_COLORS=\"di=1;36:ln=35:so=32:pi=33:ex=31:bd=34;46:cd=34;43:su=30;41:sg=30;46:tw=30;42:ow=30;43\"
 
@@ -43,9 +94,24 @@ alias cat='BAT_THEME=Dracula bat --paging=never --plain'
 function history
     builtin history --show-time=\"%Y-%m-%d %H:%M:%S \" $argv
 end
-";
-            fs::write(&dest, content)
-                .map_err(|e| format!("Failed to write config.fish: {}", e))?;
+
+# mise activation
+{}
+", mise_line);
+                fs::write(&dest, content)
+                    .map_err(|e| format!("Failed to write config.fish: {}", e))?;
+            } else {
+                log(&format!("Appending mise activation to {}", dest));
+                use std::io::Write;
+                let mut f = fs::OpenOptions::new()
+                    .append(true)
+                    .open(&dest)
+                    .map_err(|e| format!("Failed to open {}: {}", dest, e))?;
+                writeln!(f, "\n# mise activation — added by devenv-linux installer").ok();
+                write!(f, "{}", mise_line)
+                    .map_err(|e| format!("Failed to write config.fish: {}", e))?;
+            }
+
             Ok(())
         }
 
@@ -60,7 +126,12 @@ end
             log("Cloning oh-my-tmux...");
             let res = run_cmd_streaming(
                 "git",
-                &["clone", "--single-branch", "https://github.com/gpakosz/.tmux.git", &tmux_dir],
+                &[
+                    "clone",
+                    "--single-branch",
+                    "https://github.com/gpakosz/.tmux.git",
+                    &tmux_dir,
+                ],
                 log.clone(),
             );
             if !res.success {
@@ -68,44 +139,22 @@ end
             }
 
             log("Setting up symlinks...");
-            let _ = run_cmd("ln", &["-sf", &format!("{}/.tmux.conf", tmux_dir), &format!("{}/.tmux.conf", home)]);
-            let _ = run_cmd("cp", &[&format!("{}/.tmux.conf.local", tmux_dir), &format!("{}/tmux.conf.local", tmux_dir)]);
+            let _ = run_cmd(
+                "ln",
+                &[
+                    "-sf",
+                    &format!("{}/.tmux.conf", tmux_dir),
+                    &format!("{}/.tmux.conf", home),
+                ],
+            );
+            let _ = run_cmd(
+                "cp",
+                &[
+                    &format!("{}/.tmux.conf.local", tmux_dir),
+                    &format!("{}/tmux.conf.local", tmux_dir),
+                ],
+            );
 
-            Ok(())
-        }
-
-        "config-nushell" => {
-            let nu_dir = format!("{}/.config/nushell", home);
-            fs::create_dir_all(&nu_dir)
-                .map_err(|e| format!("Failed to create {}: {}", nu_dir, e))?;
-            let env_nu = format!("{}/env.nu", nu_dir);
-
-            // Idiomatic Nushell: prepend mise shims to PATH, deduplicated.
-            let mise_line = "$env.PATH = ($env.PATH | split row (char esep) | prepend ($env.HOME | path join \".local\" \"share\" \"mise\" \"shims\") | uniq)\n";
-
-            // Only append if the line isn't already there (idempotent).
-            let already_set = if Path::new(&env_nu).exists() {
-                fs::read_to_string(&env_nu)
-                    .map(|s| s.contains(".local/share/mise/shims"))
-                    .unwrap_or(false)
-            } else {
-                false
-            };
-
-            if already_set {
-                log("Nushell env.nu already contains mise shims PATH — skipping.");
-            } else {
-                log(&format!("Appending mise shims PATH to {}", env_nu));
-                use std::io::Write;
-                let mut f = fs::OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open(&env_nu)
-                    .map_err(|e| format!("Failed to open {}: {}", env_nu, e))?;
-                writeln!(f, "\n# mise shims — added by devenv-linux installer").ok();
-                write!(f, "{}", mise_line)
-                    .map_err(|e| format!("Failed to write env.nu: {}", e))?;
-            }
             Ok(())
         }
 
