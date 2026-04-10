@@ -99,15 +99,6 @@ pub fn get_all_components() -> Vec<Component> {
             None,
             &[],
         ),
-        Component::new(
-            "tmux",
-            "Tmux",
-            "Terminal multiplexer",
-            Category::SystemPackage,
-            Group::System,
-            Some("tmux"),
-            &["-V"],
-        ),
         // ── Shells ───────────────────────────────────────────────────────────
         Component::new(
             "fish",
@@ -229,6 +220,15 @@ pub fn get_all_components() -> Vec<Component> {
             Some("jaq"),
             &["--version"],
         ),
+        Component::new(
+            "zellij",
+            "Zellij",
+            "A terminal workspace with batteries included",
+            Category::Mise("zellij".to_string()),
+            Group::CliTools,
+            Some("zellij"),
+            &["--version"],
+        ),
         // ── Configurations ───────────────────────────────────────────────────
         Component::new(
             "config-bash",
@@ -243,15 +243,6 @@ pub fn get_all_components() -> Vec<Component> {
             "config-fish",
             "Fish Configuration",
             "Aliases, colors, mise paths",
-            Category::Config,
-            Group::Configurations,
-            None,
-            &[],
-        ),
-        Component::new(
-            "config-tmux",
-            "Tmux Configuration",
-            "oh-my-tmux setup",
             Category::Config,
             Group::Configurations,
             None,

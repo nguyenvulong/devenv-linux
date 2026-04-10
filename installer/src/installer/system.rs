@@ -54,7 +54,6 @@ where
                 ]),
                 _ => {}
             },
-            "tmux" => pkgs.push("tmux"),
             _ => log(&format!("Ignoring unknown system component: {}", c.id)),
         }
     }

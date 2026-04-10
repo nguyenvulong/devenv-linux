@@ -1,6 +1,6 @@
 use crate::manifest::{self, ManifestTool};
 use crate::registry::{
-    get_all_components, Category, Component, Group, InstallStatus, SelectionState,
+    Category, Component, Group, InstallStatus, SelectionState, get_all_components,
 };
 use std::sync::{Arc, Mutex};
 
@@ -47,9 +47,6 @@ impl App {
                     let config_exists = match c.id.as_str() {
                         "config-nvim" => {
                             std::path::Path::new(&format!("{}/.config/nvim", home)).exists()
-                        }
-                        "config-tmux" => {
-                            std::path::Path::new(&format!("{}/.config/tmux", home)).exists()
                         }
                         "config-bash" => std::fs::read_to_string(format!("{}/.bashrc", home))
                             .map(|s| s.contains("mise activate bash"))
