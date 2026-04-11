@@ -2,11 +2,11 @@ use crate::app::{App, Screen};
 use crate::registry::{Group, InstallStatus, SelectionState};
 use crate::theme;
 use ratatui::{
+    Frame,
     layout::{Constraint, Direction, Layout},
     style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Gauge, List, ListItem, ListState, Paragraph, Row, Table, TableState},
-    Frame,
 };
 
 pub fn draw(f: &mut Frame, app: &mut App) {

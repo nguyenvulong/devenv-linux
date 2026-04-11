@@ -1,9 +1,9 @@
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use ratatui::{backend::CrosstermBackend, prelude::Backend, Terminal};
+use ratatui::{Terminal, backend::CrosstermBackend, prelude::Backend};
 use std::{
     error::Error,
     io,
@@ -35,40 +35,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     if headless {
         return run_headless();
-    }
-
-    // ── Pre-flight: cache sudo credentials BEFORE entering raw mode ──────────
-    // Check if any SystemPackage components would be selected (i.e., need sudo).
-    // We do a quick pre-scan without the TUI to decide if we need to prompt.
-    let needs_sudo = registry::get_all_components()
-        .iter()
-        .any(|c| matches!(c.category, registry::Category::SystemPackage));
-
-    if needs_sudo {
-        println!("Some components require elevated privileges (sudo).");
-        println!("Please enter your sudo password now so installation won't block later.");
-        println!();
-
-        // Run `sudo -v` in the *normal* terminal (before raw mode) to:
-        //   1. Show the password prompt visibly to the user.
-        //   2. Cache credentials for the session.
-        let status = Command::new("sudo")
-            .arg("-v")
-            .status()
-            .map_err(|e| format!("Failed to run sudo: {}", e))?;
-
-        if !status.success() {
-            eprintln!("sudo authentication failed. Aborting.");
-            std::process::exit(1);
-        }
-
-        // Keep the credential cache alive in a background thread by refreshing
-        // every 50 seconds (default sudo timeout is 5-15 minutes, but this is
-        // an extra safety net for long installs).
-        thread::spawn(|| loop {
-            thread::sleep(Duration::from_secs(50));
-            let _ = Command::new("sudo").arg("-v").output();
-        });
     }
 
     // ── Pre-flight: Ensure mise is installed for full registry search ────────
@@ -121,6 +87,25 @@ fn run_headless() -> Result<(), Box<dyn Error>> {
         c.state = registry::SelectionState::Selected;
     }
 
+    let needs_sudo = components
+        .iter()
+        .any(|c| matches!(c.category, registry::Category::SystemPackage));
+
+    if needs_sudo {
+        println!("Some components require elevated privileges (sudo).");
+        let status = Command::new("sudo").arg("-v").status()?;
+        if !status.success() {
+            eprintln!("sudo authentication failed. Aborting.");
+            std::process::exit(1);
+        }
+        thread::spawn(|| {
+            loop {
+                thread::sleep(Duration::from_secs(50));
+                let _ = Command::new("sudo").arg("-v").output();
+            }
+        });
+    }
+
     // ── Phase 1: System packages ──────────────────────────────────────────────
     println!(">>> Phase 1: System Packages");
     let sys_comps: Vec<&registry::Component> = components
@@ -168,7 +153,10 @@ fn run_headless() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<(), Box<dyn Error>>
+fn run_app<B: Backend + std::io::Write>(
+    terminal: &mut Terminal<B>,
+    app: &mut App,
+) -> Result<(), Box<dyn Error>>
 where
     <B as Backend>::Error: 'static,
 {
@@ -229,6 +217,46 @@ where
                             app.screen = Screen::Search;
                         }
                         KeyCode::Enter => {
+                            let needs_sudo = app.components.iter().any(|c| {
+                                c.state == registry::SelectionState::Selected
+                                    && matches!(c.category, registry::Category::SystemPackage)
+                            });
+
+                            if needs_sudo {
+                                disable_raw_mode()?;
+                                execute!(
+                                    terminal.backend_mut(),
+                                    LeaveAlternateScreen,
+                                    DisableMouseCapture
+                                )?;
+                                terminal.show_cursor()?;
+
+                                println!("Some components require elevated privileges (sudo).");
+                                println!(
+                                    "Please enter your sudo password now so installation won't block later."
+                                );
+                                let status = Command::new("sudo").arg("-v").status()?;
+
+                                if !status.success() {
+                                    eprintln!("sudo authentication failed. Aborting.");
+                                    std::process::exit(1);
+                                }
+
+                                thread::spawn(|| {
+                                    loop {
+                                        thread::sleep(Duration::from_secs(50));
+                                        let _ = Command::new("sudo").arg("-v").output();
+                                    }
+                                });
+
+                                enable_raw_mode()?;
+                                execute!(
+                                    terminal.backend_mut(),
+                                    EnterAlternateScreen,
+                                    EnableMouseCapture
+                                )?;
+                            }
+
                             app.screen = Screen::Installing;
                             spawn_installation(app);
                         }

@@ -61,11 +61,7 @@ pub fn load_runtime_registry() -> Option<Vec<ManifestTool>> {
         })
         .collect();
 
-    if tools.is_empty() {
-        None
-    } else {
-        Some(tools)
-    }
+    if tools.is_empty() { None } else { Some(tools) }
 }
 
 /// Merge curated manifest with runtime registry, deduplicating by `mise_id`.

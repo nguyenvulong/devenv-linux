@@ -2,9 +2,9 @@ name: Test Installer (Ratatui TUI)
 
 on:
   push:
-    branches: [ dev ]
+    branches: [dev]
   pull_request:
-    branches: [ dev ]
+    branches: [dev]
   workflow_dispatch:
 
 jobs:
@@ -105,7 +105,7 @@ jobs:
             eza --version
             glow --version
             jaq --version
-            tmux -V
+            zellij --version
             rustc --version && cargo --version
             node --version
             go version
@@ -130,7 +130,7 @@ jobs:
           eza --version
           glow --version
           jaq --version
-          tmux -V
+          zellij --version
           rustc --version && cargo --version
           node --version
           go version
@@ -148,7 +148,6 @@ jobs:
           su - testuser -c '
             set -e
             [ -d ~/.config/nvim ]  || { echo "Missing nvim config";  exit 1; }
-            [ -d ~/.config/tmux ]  || { echo "Missing tmux config";  exit 1; }
             [ -d ~/.config/fish ]  || { echo "Missing fish config";  exit 1; }
             echo "=== All configurations verified ==="
           '
@@ -159,7 +158,6 @@ jobs:
         run: |
           set -e
           [ -d ~/.config/nvim ]  || { echo "Missing nvim config";  exit 1; }
-          [ -d ~/.config/tmux ]  || { echo "Missing tmux config";  exit 1; }
           [ -d ~/.config/fish ]  || { echo "Missing fish config";  exit 1; }
           echo "=== All configurations verified ==="
         shell: bash

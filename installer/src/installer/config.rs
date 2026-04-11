@@ -115,49 +115,6 @@ end
             Ok(())
         }
 
-        "config-tmux" => {
-            let tmux_dir = format!("{}/.config/tmux", home);
-            if Path::new(&tmux_dir).exists() {
-                let backup = format!("{}_bk", tmux_dir);
-                log(&format!("Backing up existing tmux config to {}", backup));
-                let _ = run_cmd("mv", &[&tmux_dir, &backup]);
-            }
-
-            log("Cloning oh-my-tmux...");
-            let res = run_cmd_streaming(
-                "git",
-                &[
-                    "clone",
-                    "--single-branch",
-                    "https://github.com/gpakosz/.tmux.git",
-                    &tmux_dir,
-                ],
-                log.clone(),
-            );
-            if !res.success {
-                return Err("Failed to clone oh-my-tmux".into());
-            }
-
-            log("Setting up symlinks...");
-            let _ = run_cmd(
-                "ln",
-                &[
-                    "-sf",
-                    &format!("{}/.tmux.conf", tmux_dir),
-                    &format!("{}/.tmux.conf", home),
-                ],
-            );
-            let _ = run_cmd(
-                "cp",
-                &[
-                    &format!("{}/.tmux.conf.local", tmux_dir),
-                    &format!("{}/tmux.conf.local", tmux_dir),
-                ],
-            );
-
-            Ok(())
-        }
-
         "config-nvim" => {
             let nvim_dir = format!("{}/.config/nvim", home);
             if Path::new(&nvim_dir).exists() {
