@@ -8,6 +8,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Gauge, List, ListItem, ListState, Paragraph, Row, Table, TableState},
 };
+use std::sync::atomic::Ordering;
 
 pub fn draw(f: &mut Frame, app: &mut App) {
     match app.screen {
@@ -192,7 +193,7 @@ fn draw_installing(f: &mut Frame, app: &mut App) {
         .constraints([Constraint::Length(3), Constraint::Min(10)])
         .split(f.area());
 
-    let phase = *app.install_index.lock().unwrap();
+    let phase = app.install_index.load(Ordering::Relaxed);
     const PHASES: f64 = 3.0;
     let phase_labels = ["System Packages", "Mise Tools", "Configurations"];
     let label = phase_labels.get(phase).copied().unwrap_or("Finishing…");
@@ -212,14 +213,18 @@ fn draw_installing(f: &mut Frame, app: &mut App) {
         .ratio(progress);
     f.render_widget(gauge, chunks[0]);
 
-    let logs = app.logs.lock().unwrap();
-    let display_logs = logs
-        .iter()
-        .rev()
-        .take(f.area().height as usize - 5)
-        .rev()
-        .cloned()
-        .collect::<Vec<String>>();
+    let display_logs = app
+        .logs
+        .lock()
+        .map(|logs| {
+            logs.iter()
+                .rev()
+                .take(f.area().height as usize - 5)
+                .rev()
+                .cloned()
+                .collect::<Vec<String>>()
+        })
+        .unwrap_or_default();
 
     // Alternate row colors for logs to improve readability
     let mut log_lines: Vec<Line> = Vec::new();

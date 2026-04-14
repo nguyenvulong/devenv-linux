@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct ManifestTool {
     pub name: String,
     pub mise_id: String,
@@ -75,4 +75,50 @@ pub fn merge(curated: Vec<ManifestTool>, runtime: Vec<ManifestTool>) -> Vec<Mani
         }
     }
     merged
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{merge, search, ManifestTool};
+
+    fn tool(name: &str, mise_id: &str, description: &str) -> ManifestTool {
+        ManifestTool {
+            name: name.to_string(),
+            mise_id: mise_id.to_string(),
+            description: description.to_string(),
+        }
+    }
+
+    #[test]
+    fn search_should_match_name_and_description_case_insensitively() {
+        let tools = vec![
+            tool("ripgrep", "rg", "Fast search"),
+            tool("bat", "bat", "Cat clone"),
+        ];
+
+        assert_eq!(search(&tools, "SEARCH").len(), 1);
+        assert_eq!(search(&tools, "BAT").len(), 1);
+    }
+
+    #[test]
+    fn search_should_return_all_tools_for_empty_query() {
+        let tools = vec![tool("ripgrep", "rg", "Fast search")];
+
+        assert_eq!(search(&tools, ""), tools);
+    }
+
+    #[test]
+    fn merge_should_deduplicate_by_mise_id() {
+        let curated = vec![tool("ripgrep", "rg", "Fast search")];
+        let runtime = vec![
+            tool("ripgrep", "rg", "Runtime ripgrep"),
+            tool("fd", "fd", "Fast find"),
+        ];
+
+        let merged = merge(curated, runtime);
+
+        assert_eq!(merged.len(), 2);
+        assert!(merged.iter().any(|tool| tool.mise_id == "rg"));
+        assert!(merged.iter().any(|tool| tool.mise_id == "fd"));
+    }
 }

@@ -1,8 +1,9 @@
 use crate::registry::{Category, Component};
 use crate::sys::run_cmd_streaming;
+use anyhow::{anyhow, Result};
 use std::fs;
 
-pub fn install_mise<F>(mut log: F) -> Result<(), String>
+pub fn install_mise<F>(mut log: F) -> Result<()>
 where
     F: FnMut(&str) + Send + 'static,
 {
@@ -13,16 +14,14 @@ where
     }
 
     log("Installing mise...");
-    let result = run_cmd_streaming("sh", &["-c", "curl https://mise.run | sh"], log);
+    let result = run_cmd_streaming("sh", &["-c", "curl https://mise.run | sh"], log)?;
     if result.success {
         Ok(())
     } else {
-        Err(format!("Failed to install mise: {}", result.stderr))
+        Err(anyhow!("Failed to install mise: {}", result.stderr.trim()))
     }
 }
 
-/// Resolve the path to the mise binary.
-/// mise installs itself to ~/.local/bin/mise, which may not be on PATH yet.
 pub fn mise_bin() -> String {
     if crate::sys::check_command_exists("mise") {
         return "mise".to_string();
@@ -32,10 +31,10 @@ pub fn mise_bin() -> String {
     if fs::metadata(&home_mise).is_ok() {
         return home_mise;
     }
-    "mise".to_string() // last resort — will fail with a clear error
+    "mise".to_string()
 }
 
-pub fn activate_mise_tools<F>(components: &[&Component], mut log: F) -> Result<(), String>
+pub fn activate_mise_tools<F>(components: &[&Component], mut log: F) -> Result<()>
 where
     F: FnMut(&str) + Send + 'static + Clone,
 {
@@ -45,34 +44,29 @@ where
     }
 
     let mise = mise_bin();
+    let mut failed_plugins = Vec::new();
 
-    // Install each tool individually so a single unknown-registry name
-    // does not abort the entire installation batch.
-    let mut any_error = false;
     for c in components {
         if let Category::Mise(ref plugin) = c.category {
             let tool_spec = format!("{}@latest", plugin);
             log(&format!("Installing: mise use -g {}", tool_spec));
 
-            let result = run_cmd_streaming(&mise, &["use", "-g", &tool_spec], log.clone());
+            let result = run_cmd_streaming(&mise, &["use", "-g", &tool_spec], log.clone())?;
 
             if !result.success {
-                log(&format!(
-                    "[WARN] Failed to install {}: {}",
-                    plugin,
-                    result.stderr.trim()
-                ));
-                any_error = true;
-                // Continue — don't abort the loop for one bad tool.
+                let error = result.stderr.trim().to_string();
+                log(&format!("[WARN] Failed to install {}: {}", plugin, error));
+                failed_plugins.push(format!("{plugin} ({error})"));
             }
         }
     }
 
-    if any_error {
-        // Return Ok so the caller doesn't treat this as a fatal error;
-        // individual [WARN] lines already surfaced the details.
-        log("[WARN] Some mise tools failed to install (see above).");
+    if failed_plugins.is_empty() {
+        Ok(())
+    } else {
+        Err(anyhow!(
+            "Some mise tools failed to install: {}",
+            failed_plugins.join(", ")
+        ))
     }
-
-    Ok(())
 }
