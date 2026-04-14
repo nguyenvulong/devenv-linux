@@ -267,6 +267,7 @@ dependencies = [
 name = "devenv"
 version = "0.5.0"
 dependencies = [
+ "anyhow",
  "crossterm",
  "ratatui",
  "serde",

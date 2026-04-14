@@ -1,8 +1,11 @@
 use crate::manifest::{self, ManifestTool};
 use crate::registry::{
-    Category, Component, Group, InstallStatus, SelectionState, get_all_components,
+    get_all_components, Category, Component, Group, InstallStatus, SelectionState,
 };
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    atomic::{AtomicBool, AtomicUsize},
+    Arc, Mutex,
+};
 
 #[derive(PartialEq, Eq)]
 pub enum Screen {
@@ -16,22 +19,13 @@ pub struct App {
     pub components: Vec<Component>,
     pub cursor: usize,
     pub screen: Screen,
-    /// Shared log buffer written by the installer thread, read by the UI.
     pub logs: Arc<Mutex<Vec<String>>>,
-    /// Set to true by the installer thread when all phases finish.
-    pub install_done: Arc<Mutex<bool>>,
-    /// Phase counter (0=sys, 1=mise, 2=config) for the progress gauge.
-    pub install_index: Arc<Mutex<usize>>,
+    pub install_done: Arc<AtomicBool>,
+    pub install_index: Arc<AtomicUsize>,
     pub should_quit: bool,
-
-    // ── Search state ─────────────────────────────────────────────────────────
-    /// All known tools (curated manifest + optional runtime registry).
     pub manifest_tools: Vec<ManifestTool>,
-    /// Current text typed in the search box.
     pub search_query: String,
-    /// Filtered results matching search_query.
     pub search_results: Vec<ManifestTool>,
-    /// Cursor position within search_results.
     pub search_cursor: usize,
 }
 
@@ -40,7 +34,6 @@ impl App {
         let home = std::env::var("HOME").unwrap_or_default();
         let mut components = get_all_components();
 
-        // Detect already-installed tools and set sensible defaults.
         for c in &mut components {
             match &c.category {
                 Category::Config => {
@@ -109,7 +102,6 @@ impl App {
             }
         }
 
-        // ── Load manifest (curated + optional runtime) ────────────────────────
         let curated = manifest::load_manifest();
         let manifest_tools = if crate::sys::check_command_exists("mise") {
             if let Some(runtime) = manifest::load_runtime_registry() {
@@ -128,8 +120,8 @@ impl App {
             cursor: 0,
             screen: Screen::Selection,
             logs: Arc::new(Mutex::new(Vec::new())),
-            install_done: Arc::new(Mutex::new(false)),
-            install_index: Arc::new(Mutex::new(0)),
+            install_done: Arc::new(AtomicBool::new(false)),
+            install_index: Arc::new(AtomicUsize::new(0)),
             should_quit: false,
             manifest_tools,
             search_query: String::new(),
@@ -166,7 +158,6 @@ impl App {
         }
     }
 
-    /// Update search_results based on current search_query.
     pub fn update_search(&mut self) {
         self.search_results = manifest::search(&self.manifest_tools, &self.search_query);
         self.search_cursor = 0;
@@ -184,14 +175,11 @@ impl App {
         }
     }
 
-    /// Add the currently highlighted search result to the component list.
-    /// Creates a Mise component in the ExtraTools group. Deduplicates by mise_id.
     pub fn add_search_result(&mut self) {
         let Some(tool) = self.search_results.get(self.search_cursor).cloned() else {
             return;
         };
 
-        // Dedup: skip if a component with the same mise_id already exists.
         let already_exists = self
             .components
             .iter()
@@ -200,7 +188,6 @@ impl App {
             return;
         }
 
-        // Derive a simple check command: the last path segment of name.
         let check_cmd = tool.name.clone();
 
         let mut new_comp = Component::new(
@@ -213,7 +200,6 @@ impl App {
             &["--version"],
         );
 
-        // Check if it's already installed on PATH.
         if crate::sys::check_command_exists(&check_cmd) {
             new_comp.state = SelectionState::Unselected;
             new_comp.status = InstallStatus::Installed("Detected".to_string());
@@ -223,7 +209,57 @@ impl App {
         }
 
         self.components.push(new_comp);
-        // Set cursor to the newly added item.
         self.cursor = self.components.len() - 1;
+    }
+
+    pub fn has_selected_system_packages(&self) -> bool {
+        self.components.iter().any(|component| {
+            component.state == SelectionState::Selected
+                && matches!(component.category, Category::SystemPackage)
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::App;
+    use crate::registry::{Category, Component, Group, SelectionState};
+
+    #[test]
+    fn has_selected_system_packages_should_only_return_true_for_selected_system_items() {
+        let mut system = Component::new(
+            "base-deps",
+            "Base Dependencies",
+            "Compilers, curl, git, tar, unzip",
+            Category::SystemPackage,
+            Group::System,
+            None,
+            &[],
+        );
+        system.state = SelectionState::Selected;
+
+        let mut app = App::new();
+        app.components = vec![system];
+
+        assert!(app.has_selected_system_packages());
+    }
+
+    #[test]
+    fn has_selected_system_packages_should_ignore_unselected_items() {
+        let mut system = Component::new(
+            "base-deps",
+            "Base Dependencies",
+            "Compilers, curl, git, tar, unzip",
+            Category::SystemPackage,
+            Group::System,
+            None,
+            &[],
+        );
+        system.state = SelectionState::Unselected;
+
+        let mut app = App::new();
+        app.components = vec![system];
+
+        assert!(!app.has_selected_system_packages());
     }
 }
