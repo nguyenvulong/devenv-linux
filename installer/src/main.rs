@@ -36,7 +36,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         return run_headless();
     }
 
-<<<<<<< HEAD
     if !sys::check_command_exists("mise") {
         let mise_path = installer::mise::mise_bin();
         if mise_path == "mise" {
@@ -45,9 +44,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
-=======
-    // ── Enter the TUI ────────────────────────────────────────────────────────
->>>>>>> 63bade4 (fix: sudo password is only needed for system packages)
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
@@ -399,29 +395,6 @@ mod tests {
 
     #[test]
     fn install_plan_should_separate_selected_system_packages() {
-<<<<<<< HEAD
-=======
-        let mut system = Component::new(
-            "tmux",
-            "Tmux",
-            "Terminal multiplexer",
-            Category::SystemPackage,
-            Group::System,
-            Some("tmux"),
-            &["-V"],
-        );
-        system.state = SelectionState::Selected;
-
-        let plan = InstallPlan::from_components(&[system]);
-
-        assert_eq!(plan.system.len(), 1);
-        assert!(plan.mise.is_empty());
-        assert!(plan.configs.is_empty());
-    }
-
-    #[test]
-    fn install_plan_should_only_clone_selected_components_per_phase() {
->>>>>>> 63bade4 (fix: sudo password is only needed for system packages)
         let mut system = Component::new(
             "base-deps",
             "Base Dependencies",
