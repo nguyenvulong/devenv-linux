@@ -79,7 +79,7 @@ pub fn merge(curated: Vec<ManifestTool>, runtime: Vec<ManifestTool>) -> Vec<Mani
 
 #[cfg(test)]
 mod tests {
-    use super::{merge, search, ManifestTool};
+    use super::{ManifestTool, merge, search};
 
     fn tool(name: &str, mise_id: &str, description: &str) -> ManifestTool {
         ManifestTool {

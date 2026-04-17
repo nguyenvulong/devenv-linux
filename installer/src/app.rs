@@ -1,10 +1,10 @@
 use crate::manifest::{self, ManifestTool};
 use crate::registry::{
-    get_all_components, Category, Component, Group, InstallStatus, SelectionState,
+    Category, Component, Group, InstallStatus, SelectionState, get_all_components,
 };
 use std::sync::{
-    atomic::{AtomicBool, AtomicUsize},
     Arc, Mutex,
+    atomic::{AtomicBool, AtomicUsize},
 };
 
 #[derive(PartialEq, Eq)]
@@ -52,7 +52,7 @@ impl App {
                         _ => false,
                     };
                     if config_exists {
-                        c.state = SelectionState::KeepAsIs;
+                        c.state = SelectionState::Selected;
                         c.status = InstallStatus::Installed("Exists".to_string());
                     } else {
                         c.state = SelectionState::Selected;
@@ -61,11 +61,11 @@ impl App {
                 }
                 Category::Mise(tool) => {
                     if let Some(v) = crate::sys::get_mise_tool_version(tool) {
-                        c.state = SelectionState::Unselected;
+                        c.state = SelectionState::Selected;
                         c.status = InstallStatus::Installed(v);
                     } else if let Some(cmd) = &c.check_command {
                         if crate::sys::check_command_exists(cmd) {
-                            c.state = SelectionState::Unselected;
+                            c.state = SelectionState::Selected;
                             c.status = InstallStatus::Installed("Detected".to_string());
                         } else {
                             c.state = SelectionState::Unselected;
@@ -144,18 +144,10 @@ impl App {
 
     pub fn toggle_selection(&mut self) {
         let c = &mut self.components[self.cursor];
-        if matches!(c.category, Category::Config) && c.status != InstallStatus::NotInstalled {
-            c.state = match c.state {
-                SelectionState::Selected => SelectionState::KeepAsIs,
-                SelectionState::KeepAsIs => SelectionState::Unselected,
-                SelectionState::Unselected => SelectionState::Selected,
-            };
-        } else {
-            c.state = match c.state {
-                SelectionState::Selected => SelectionState::Unselected,
-                _ => SelectionState::Selected,
-            };
-        }
+        c.state = match c.state {
+            SelectionState::Selected => SelectionState::Unselected,
+            _ => SelectionState::Selected,
+        };
     }
 
     pub fn update_search(&mut self) {
@@ -201,7 +193,7 @@ impl App {
         );
 
         if crate::sys::check_command_exists(&check_cmd) {
-            new_comp.state = SelectionState::Unselected;
+            new_comp.state = SelectionState::Selected;
             new_comp.status = InstallStatus::Installed("Detected".to_string());
         } else {
             new_comp.state = SelectionState::Unselected;

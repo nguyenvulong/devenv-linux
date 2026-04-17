@@ -46,8 +46,6 @@ pub enum InstallStatus {
 pub enum SelectionState {
     Selected,
     Unselected,
-    // For configs where we might want to skip overwriting existing user data
-    KeepAsIs,
 }
 
 #[derive(Debug, Clone)]

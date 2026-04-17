@@ -1,9 +1,9 @@
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use ratatui::{backend::CrosstermBackend, prelude::Backend, Terminal};
+use ratatui::{Terminal, backend::CrosstermBackend, prelude::Backend};
 use std::{
     error::Error,
     io,
@@ -23,7 +23,7 @@ mod theme;
 mod ui;
 
 use app::{App, Screen};
-use registry::{Category, Component, SelectionState};
+use registry::{Category, Component, InstallStatus, SelectionState};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let headless = std::env::args().any(|a| a == "--all")
@@ -159,7 +159,9 @@ where
             continue;
         }
 
-        if event::poll(Duration::from_millis(100))? && let Event::Key(key) = event::read()? {
+        if event::poll(Duration::from_millis(100))?
+            && let Event::Key(key) = event::read()?
+        {
             match app.screen {
                 Screen::Selection => match key.code {
                     KeyCode::Char('q') | KeyCode::Esc => app.should_quit = true,
@@ -264,17 +266,19 @@ fn has_cached_sudo_credentials() -> Result<bool, Box<dyn Error>> {
 }
 
 fn start_sudo_keepalive() {
-    thread::spawn(|| loop {
-        thread::sleep(Duration::from_secs(50));
-        let Ok(status) = Command::new("sudo").args(["-n", "true"]).status() else {
-            break;
-        };
+    thread::spawn(|| {
+        loop {
+            thread::sleep(Duration::from_secs(50));
+            let Ok(status) = Command::new("sudo").args(["-n", "true"]).status() else {
+                break;
+            };
 
-        if !status.success() {
-            break;
+            if !status.success() {
+                break;
+            }
+
+            let _ = Command::new("sudo").arg("-v").output();
         }
-
-        let _ = Command::new("sudo").arg("-v").output();
     });
 }
 
@@ -318,6 +322,15 @@ fn spawn_installation(app: &mut App) {
         install_index.store(1, Ordering::Relaxed);
         push_log(&logs, "\n>>> Phase 2: Mise Tools");
 
+        let uninstall_comps: Vec<&Component> = install_plan.uninstall_mise.iter().collect();
+        if !uninstall_comps.is_empty() {
+            let res =
+                installer::mise::deactivate_mise_tools(&uninstall_comps, make_log(logs.clone()));
+            if let Err(e) = res {
+                push_log(&logs, format!("[ERROR] mise tools removal: {}", e));
+            }
+        }
+
         let mise_comps: Vec<&Component> = install_plan.mise.iter().collect();
         if !mise_comps.is_empty() {
             match installer::mise::install_mise(make_log(logs.clone())) {
@@ -356,6 +369,7 @@ fn push_log(logs: &Arc<Mutex<Vec<String>>>, message: impl Into<String>) {
 struct InstallPlan {
     system: Vec<Component>,
     mise: Vec<Component>,
+    uninstall_mise: Vec<Component>,
     configs: Vec<Component>,
 }
 
@@ -368,6 +382,7 @@ impl InstallPlan {
             mise: collect_selected_components(components, |category| {
                 matches!(category, Category::Mise(_))
             }),
+            uninstall_mise: collect_uninstall_mise_components(components),
             configs: collect_selected_components(components, |category| {
                 matches!(category, Category::Config)
             }),
@@ -383,6 +398,18 @@ fn collect_selected_components(
         .iter()
         .filter(|component| {
             component.state == SelectionState::Selected && predicate(&component.category)
+        })
+        .cloned()
+        .collect()
+}
+
+fn collect_uninstall_mise_components(components: &[Component]) -> Vec<Component> {
+    components
+        .iter()
+        .filter(|component| {
+            component.state == SelectionState::Unselected
+                && matches!(component.category, Category::Mise(_))
+                && matches!(component.status, InstallStatus::Installed(_))
         })
         .cloned()
         .collect()
@@ -410,6 +437,7 @@ mod tests {
 
         assert_eq!(plan.system.len(), 1);
         assert!(plan.mise.is_empty());
+        assert!(plan.uninstall_mise.is_empty());
         assert!(plan.configs.is_empty());
     }
 
@@ -446,12 +474,13 @@ mod tests {
             None,
             &[],
         );
-        config.state = SelectionState::KeepAsIs;
+        config.state = SelectionState::Unselected;
 
         let plan = InstallPlan::from_components(&[system, mise, config]);
 
         assert_eq!(plan.system.len(), 1);
         assert_eq!(plan.mise.len(), 1);
+        assert!(plan.uninstall_mise.is_empty());
         assert!(plan.configs.is_empty());
     }
 }
