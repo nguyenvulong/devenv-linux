@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 use std::thread;
@@ -197,7 +197,7 @@ fn parse_command_version_output(stdout: &str, stderr: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        parse_command_version_output, parse_distro, parse_mise_tool_version, DistroFamily,
+        DistroFamily, parse_command_version_output, parse_distro, parse_mise_tool_version,
     };
 
     #[test]

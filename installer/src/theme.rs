@@ -34,8 +34,10 @@ pub fn selection_unselected_style() -> Style {
     Style::default().fg(COLOR_MUTED)
 }
 
-pub fn selection_keep_style() -> Style {
-    Style::default().fg(COLOR_WARNING)
+pub fn selection_uninstall_style() -> Style {
+    Style::default()
+        .fg(COLOR_ERROR)
+        .add_modifier(Modifier::BOLD)
 }
 
 pub fn item_highlight_style() -> Style {

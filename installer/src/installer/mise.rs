@@ -1,6 +1,6 @@
 use crate::registry::{Category, Component};
 use crate::sys::run_cmd_streaming;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use std::fs;
 
 pub fn install_mise<F>(mut log: F) -> Result<()>
@@ -66,6 +66,41 @@ where
     } else {
         Err(anyhow!(
             "Some mise tools failed to install: {}",
+            failed_plugins.join(", ")
+        ))
+    }
+}
+
+pub fn deactivate_mise_tools<F>(components: &[&Component], mut log: F) -> Result<()>
+where
+    F: FnMut(&str) + Send + 'static + Clone,
+{
+    if components.is_empty() {
+        return Ok(());
+    }
+
+    let mise = mise_bin();
+    let mut failed_plugins = Vec::new();
+
+    for c in components {
+        if let Category::Mise(ref plugin) = c.category {
+            log(&format!("Uninstalling: mise unuse -g {}", plugin));
+
+            let result = run_cmd_streaming(&mise, &["unuse", "-g", plugin], log.clone())?;
+
+            if !result.success {
+                let error = result.stderr.trim().to_string();
+                log(&format!("[WARN] Failed to uninstall {}: {}", plugin, error));
+                failed_plugins.push(format!("{plugin} ({error})"));
+            }
+        }
+    }
+
+    if failed_plugins.is_empty() {
+        Ok(())
+    } else {
+        Err(anyhow!(
+            "Some mise tools failed to uninstall: {}",
             failed_plugins.join(", ")
         ))
     }

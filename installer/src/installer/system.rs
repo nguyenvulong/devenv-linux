@@ -1,5 +1,5 @@
 use crate::registry::Component;
-use crate::sys::{get_distro, run_cmd_streaming, DistroFamily};
+use crate::sys::{DistroFamily, get_distro, run_cmd_streaming};
 
 pub fn install_system_packages<F>(components: &[&Component], mut log: F) -> anyhow::Result<()>
 where

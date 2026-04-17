@@ -1,6 +1,6 @@
-use crate::registry::{Component, SelectionState};
-use crate::sys::{run_cmd, run_cmd_streaming, CommandResult};
-use anyhow::{anyhow, Context, Result};
+use crate::registry::Component;
+use crate::sys::{CommandResult, run_cmd, run_cmd_streaming};
+use anyhow::{Context, Result, anyhow};
 use std::fs;
 use std::path::Path;
 
@@ -8,14 +8,6 @@ pub fn setup_config<F>(component: &Component, mut log: F) -> Result<()>
 where
     F: FnMut(&str) + Send + 'static + Clone,
 {
-    if component.state == SelectionState::KeepAsIs {
-        log(&format!(
-            "Skipping config {} (Keep as-is selected)",
-            component.id
-        ));
-        return Ok(());
-    }
-
     let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
 
     match component.id.as_str() {

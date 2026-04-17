@@ -65,13 +65,27 @@ fn draw_selection(f: &mut Frame, app: &mut App) {
 
         let prefix = match c.state {
             SelectionState::Selected => "[✓] ",
-            SelectionState::Unselected => "[ ] ",
-            SelectionState::KeepAsIs => "[~] ",
+            SelectionState::Unselected => {
+                if matches!(c.status, InstallStatus::Installed(_))
+                    && matches!(c.category, crate::registry::Category::Mise(_))
+                {
+                    "[✗] "
+                } else {
+                    "[ ] "
+                }
+            }
         };
         let prefix_style = match c.state {
             SelectionState::Selected => theme::selection_selected_style(),
-            SelectionState::Unselected => theme::selection_unselected_style(),
-            SelectionState::KeepAsIs => theme::selection_keep_style(),
+            SelectionState::Unselected => {
+                if matches!(c.status, InstallStatus::Installed(_))
+                    && matches!(c.category, crate::registry::Category::Mise(_))
+                {
+                    theme::selection_uninstall_style()
+                } else {
+                    theme::selection_unselected_style()
+                }
+            }
         };
 
         // Simplified list line (description goes to details pane)
@@ -178,8 +192,8 @@ fn draw_selection(f: &mut Frame, app: &mut App) {
             Span::raw("<Enter>   "),
             Span::styled(" Quit ", theme::shortcut_action_style(theme::COLOR_ERROR)),
             Span::raw("q   "),
-            Span::styled(" [~] ", theme::selection_keep_style()),
-            Span::raw("= keep existing config"),
+            Span::styled(" [✗] ", theme::selection_uninstall_style()),
+            Span::raw("= uninstall"),
         ]),
     ];
 
@@ -272,12 +286,15 @@ fn draw_report(f: &mut Frame, app: &mut App) {
     for c in &app.components {
         let (action, status_msg, color) = match c.state {
             SelectionState::Unselected => {
-                skipped_count += 1;
-                ("Skip", "Not Selected", theme::COLOR_MUTED)
-            }
-            SelectionState::KeepAsIs => {
-                skipped_count += 1;
-                ("Skip", "Kept as-is", theme::COLOR_MUTED)
+                if matches!(c.status, InstallStatus::Installed(_))
+                    && matches!(c.category, crate::registry::Category::Mise(_))
+                {
+                    installed_count += 1;
+                    ("Uninstall", "Removed", theme::COLOR_ERROR)
+                } else {
+                    skipped_count += 1;
+                    ("Skip", "Not Selected", theme::COLOR_MUTED)
+                }
             }
             SelectionState::Selected => {
                 installed_count += 1;
