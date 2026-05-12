@@ -1,0 +1,89 @@
+# devenv-linux headless install config.
+# Copy this file and edit enabled/version values, then run:
+# ./devenv --config devenv.example.toml
+
+[[components]]
+id = "base-deps"
+enabled = true
+
+[[components]]
+id = "fish"
+enabled = true
+version = "latest"
+
+[[components]]
+id = "neovim"
+enabled = true
+version = "latest"
+
+[[components]]
+id = "rust"
+enabled = true
+version = "latest"
+
+[[components]]
+id = "node"
+enabled = true
+version = "latest"
+
+[[components]]
+id = "go"
+enabled = true
+version = "latest"
+
+[[components]]
+id = "python"
+enabled = true
+version = "latest"
+
+[[components]]
+id = "fzf"
+enabled = true
+version = "latest"
+
+[[components]]
+id = "ripgrep"
+enabled = true
+version = "latest"
+
+[[components]]
+id = "fd"
+enabled = true
+version = "latest"
+
+[[components]]
+id = "bat"
+enabled = true
+version = "latest"
+
+[[components]]
+id = "eza"
+enabled = true
+version = "latest"
+
+[[components]]
+id = "glow"
+enabled = true
+version = "latest"
+
+[[components]]
+id = "jaq"
+enabled = true
+version = "latest"
+
+[[components]]
+id = "zellij"
+enabled = true
+version = "latest"
+
+[[components]]
+id = "config-bash"
+enabled = true
+
+[[components]]
+id = "config-fish"
+enabled = true
+
+[[components]]
+id = "config-nvim"
+enabled = true

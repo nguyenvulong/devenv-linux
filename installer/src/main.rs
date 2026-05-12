@@ -8,6 +8,7 @@ use std::{
     error::Error,
     io,
     io::Write,
+    path::PathBuf,
     process::Command,
     sync::{Arc, Mutex, atomic::Ordering},
     thread,
@@ -15,6 +16,7 @@ use std::{
 };
 
 mod app;
+mod headless_config;
 mod installer;
 mod manifest;
 mod registry;
@@ -26,7 +28,12 @@ use app::{App, Screen};
 use registry::{Category, Component, InstallStatus, SelectionState};
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let headless = std::env::args().any(|a| a == "--all")
+    let args: Vec<String> = std::env::args().collect();
+    if let Some(config_path) = headless_config_path(&args)? {
+        return run_headless_config(config_path);
+    }
+
+    let headless = args.iter().any(|a| a == "--all")
         || std::env::var("CI").map(|v| v == "true").unwrap_or(false)
         || std::env::var("INSTALLER_ALL")
             .map(|v| v == "1")
@@ -68,18 +75,50 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn run_headless() -> Result<(), Box<dyn Error>> {
-    println!("==> devenv-linux headless installer (--all mode)");
-    println!();
+fn headless_config_path(args: &[String]) -> Result<Option<PathBuf>, Box<dyn Error>> {
+    let mut iter = args.iter().skip(1);
+    while let Some(arg) = iter.next() {
+        if arg == "--config" || arg == "-c" {
+            let Some(path) = iter.next() else {
+                return Err(format!("{arg} requires a path").into());
+            };
+            return Ok(Some(PathBuf::from(path)));
+        }
 
+        if let Some(path) = arg.strip_prefix("--config=") {
+            if path.is_empty() {
+                return Err("--config requires a path".into());
+            }
+            return Ok(Some(PathBuf::from(path)));
+        }
+    }
+
+    Ok(None)
+}
+
+fn run_headless() -> Result<(), Box<dyn Error>> {
     let mut components = registry::get_all_components();
     for c in &mut components {
         c.state = registry::SelectionState::Selected;
     }
 
-    let needs_sudo = components
-        .iter()
-        .any(|c| matches!(c.category, registry::Category::SystemPackage));
+    run_headless_components(components, "--all mode")
+}
+
+fn run_headless_config(config_path: PathBuf) -> Result<(), Box<dyn Error>> {
+    let components = headless_config::components_from_file(&config_path)?;
+    run_headless_components(
+        components,
+        &format!("config mode: {}", config_path.display()),
+    )
+}
+
+fn run_headless_components(components: Vec<Component>, mode: &str) -> Result<(), Box<dyn Error>> {
+    println!("==> devenv-linux headless installer ({mode})");
+    println!();
+
+    let install_plan = InstallPlan::from_components(&components);
+    let needs_sudo = !install_plan.system.is_empty();
 
     if needs_sudo {
         println!("Some components require elevated privileges (sudo).");
@@ -92,10 +131,7 @@ fn run_headless() -> Result<(), Box<dyn Error>> {
     }
 
     println!(">>> Phase 1: System Packages");
-    let sys_comps: Vec<&registry::Component> = components
-        .iter()
-        .filter(|c| matches!(c.category, registry::Category::SystemPackage))
-        .collect();
+    let sys_comps: Vec<&registry::Component> = install_plan.system.iter().collect();
     if let Err(e) =
         installer::system::install_system_packages(&sys_comps, |msg| println!("{}", msg))
     {
@@ -103,10 +139,7 @@ fn run_headless() -> Result<(), Box<dyn Error>> {
     }
 
     println!("\n>>> Phase 2: Mise Tools");
-    let mise_comps: Vec<&registry::Component> = components
-        .iter()
-        .filter(|c| matches!(c.category, registry::Category::Mise(_)))
-        .collect();
+    let mise_comps: Vec<&registry::Component> = install_plan.mise.iter().collect();
     if !mise_comps.is_empty() {
         match installer::mise::install_mise(|msg| println!("{}", msg)) {
             Err(e) => eprintln!("[ERROR] mise install: {}", e),
@@ -121,10 +154,7 @@ fn run_headless() -> Result<(), Box<dyn Error>> {
     }
 
     println!("\n>>> Phase 3: Configurations");
-    let cfg_comps: Vec<&registry::Component> = components
-        .iter()
-        .filter(|c| matches!(c.category, registry::Category::Config))
-        .collect();
+    let cfg_comps: Vec<&registry::Component> = install_plan.configs.iter().collect();
     for cfg in cfg_comps {
         if let Err(e) = installer::config::setup_config(cfg, |msg| println!("{}", msg)) {
             eprintln!("[ERROR] config {}: {}", cfg.id, e);
@@ -417,8 +447,9 @@ fn collect_uninstall_mise_components(components: &[Component]) -> Vec<Component>
 
 #[cfg(test)]
 mod tests {
-    use super::InstallPlan;
+    use super::{InstallPlan, headless_config_path};
     use crate::registry::{Category, Component, Group, SelectionState};
+    use std::path::PathBuf;
 
     #[test]
     fn install_plan_should_separate_selected_system_packages() {
@@ -482,5 +513,58 @@ mod tests {
         assert_eq!(plan.mise.len(), 1);
         assert!(plan.uninstall_mise.is_empty());
         assert!(plan.configs.is_empty());
+    }
+
+    #[test]
+    fn install_plan_should_preserve_mise_versions() {
+        let mut mise = Component::new(
+            "rust",
+            "Rust",
+            "Rust programming language",
+            Category::Mise("rust".to_string()),
+            Group::Languages,
+            Some("rustc"),
+            &["--version"],
+        );
+        mise.state = SelectionState::Selected;
+        mise.mise_version = Some("1.85.0".to_string());
+
+        let plan = InstallPlan::from_components(&[mise]);
+
+        assert_eq!(plan.mise[0].mise_version.as_deref(), Some("1.85.0"));
+    }
+
+    #[test]
+    fn headless_config_path_should_parse_long_flag() {
+        let args = vec![
+            "devenv".to_string(),
+            "--config".to_string(),
+            "devenv.example.toml".to_string(),
+        ];
+
+        assert_eq!(
+            headless_config_path(&args).expect("args should parse"),
+            Some(PathBuf::from("devenv.example.toml"))
+        );
+    }
+
+    #[test]
+    fn headless_config_path_should_parse_equals_form() {
+        let args = vec![
+            "devenv".to_string(),
+            "--config=devenv.example.toml".to_string(),
+        ];
+
+        assert_eq!(
+            headless_config_path(&args).expect("args should parse"),
+            Some(PathBuf::from("devenv.example.toml"))
+        );
+    }
+
+    #[test]
+    fn headless_config_path_should_reject_missing_path() {
+        let args = vec!["devenv".to_string(), "--config".to_string()];
+
+        assert!(headless_config_path(&args).is_err());
     }
 }
