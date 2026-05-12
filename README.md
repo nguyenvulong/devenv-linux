@@ -28,13 +28,46 @@ source ~/.config/fish/config.fish
 
 ## Headless / CI Mode
 
-Skip the TUI and install everything automatically:
+There are two non-interactive install modes.
+
+Install every built-in component. This is useful for CI images and disposable
+development environments:
 
 ```bash
 ./devenv --all
 # or
 CI=true ./devenv
 ```
+
+Install from a prepared config file when you want to choose components or pin
+mise-managed tool versions:
+
+```bash
+./devenv --config devenv.example.toml
+# or
+./devenv -c devenv.example.toml
+```
+
+Start from `devenv.example.toml`, which includes every built-in component. Only
+entries with `enabled = true` are installed. Omit `version` or set it to
+`"latest"` to keep the default mise behavior. Pinned versions apply only to
+mise-managed tools; system packages and configuration tasks do not accept a
+`version` field.
+
+```toml
+[[components]]
+id = "rust"
+enabled = true
+version = "1.85.0"
+
+[[components]]
+id = "config-fish"
+enabled = true
+```
+
+The installer validates config files before installing. Unknown component IDs,
+duplicate component entries, empty versions, and `version` fields on non-mise
+components fail with an error.
 
 ## License
 

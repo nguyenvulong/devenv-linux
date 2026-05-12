@@ -57,6 +57,7 @@ pub struct Component {
     pub group: Group,
     pub check_command: Option<String>,
     pub check_args: Vec<String>,
+    pub mise_version: Option<String>,
     pub state: SelectionState,
     pub status: InstallStatus,
 }
@@ -79,6 +80,7 @@ impl Component {
             group,
             check_command: check_command.map(|s| s.to_string()),
             check_args: check_args.iter().map(|&s| s.to_string()).collect(),
+            mise_version: None,
             state: SelectionState::Unselected,
             status: InstallStatus::Checking,
         }
