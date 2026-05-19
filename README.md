@@ -2,7 +2,7 @@
 
 `devenv-linux` is a small Linux development environment bootstrapper with an interactive TUI installer built in Rust. It installs a curated setup with tools managed by [mise](https://mise.jdx.dev), including Fish, Bash config helpers, Neovim, common CLI tools, and Zellij.
 
-Supported distros: Ubuntu 24.04, Debian 13, Fedora 43, and Arch Linux.
+Supported distros: Ubuntu 24.04, Debian 13, Fedora 43, and rolling Arch Linux.
 
 ## Quick Start
 
@@ -15,7 +15,7 @@ curl -fsSL https://raw.githubusercontent.com/nguyenvulong/devenv-linux/main/inst
 Or download and run the latest release binary directly:
 
 ```bash
-curl -fsSL https://github.com/nguyenvulong/devenv-linux/releases/latest/download/devenv-$(uname -m).tar.xz | tar -xJ
+curl -fsSL https://github.com/nguyenvulong/devenv-linux/releases/latest/download/$(uname -m).tar.xz | tar xJ
 ./devenv
 ```
 
@@ -26,9 +26,9 @@ source ~/.bashrc
 source ~/.config/fish/config.fish
 ```
 
-## Headless / CI Mode
+## Non-Interactive Install Modes
 
-There are two non-interactive install modes.
+### Install Everything
 
 Install every built-in component. This is useful for CI images and disposable
 development environments:
@@ -38,6 +38,8 @@ development environments:
 # or
 CI=true ./devenv
 ```
+
+### Install From Config
 
 Install from a prepared config file when you want to choose components or pin
 mise-managed tool versions:

@@ -62,6 +62,7 @@ devenv-linux/
 - No `tmux` or `nushell`
 - Search uses embedded `mise_registry.toml`, with runtime `mise registry` fallback when available
 - Config-driven headless installs use TOML component IDs from `devenv.example.toml`; mise tool versions default to `latest`
+- Release assets are named by architecture only (`x86_64.tar.xz`, `aarch64.tar.xz`) so `/releases/latest/download/...` URLs stay stable across versions.
 
 ## Key Implementation Notes
 

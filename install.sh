@@ -44,7 +44,7 @@ fi
 echo -e "${BLUE}Latest version: v${VERSION}${NC}"
 
 # ── Download and extract ──────────────────────────────────────────────────────
-ARCHIVE="devenv-${VERSION}-${ARCH_LABEL}.tar.xz"
+ARCHIVE="${ARCH_LABEL}.tar.xz"
 URL="https://github.com/${REPO}/releases/download/v${VERSION}/${ARCHIVE}"
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT

@@ -83,7 +83,7 @@ jobs:
           VERSION="${{ needs.validate.outputs.version }}"
           ARCH="${{ matrix.arch }}"
           BINARY="installer/target/${{ matrix.target }}/release/devenv"
-          ARCHIVE="devenv-${VERSION}-${ARCH}.tar.xz"
+          ARCHIVE="${ARCH}.tar.xz"
 
           cp "$BINARY" devenv
           tar -cJf "$ARCHIVE" devenv
@@ -96,7 +96,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: devenv-${{ matrix.arch }}
-          path: devenv-${{ needs.validate.outputs.version }}-${{ matrix.arch }}.tar.xz
+          path: ${{ matrix.arch }}.tar.xz
           if-no-files-found: error
 
   # ── Publish GitHub Release ──────────────────────────────────────────────────
@@ -127,5 +127,5 @@ jobs:
           draft: ${{ github.event_name == 'workflow_dispatch' }}
           generate_release_notes: true
           files: |
-            dist/devenv-${{ needs.validate.outputs.version }}-x86_64.tar.xz
-            dist/devenv-${{ needs.validate.outputs.version }}-aarch64.tar.xz
+            dist/x86_64.tar.xz
+            dist/aarch64.tar.xz
