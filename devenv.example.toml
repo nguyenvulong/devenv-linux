@@ -1,20 +1,29 @@
 # devenv-linux headless install config.
-# Copy this file and edit enabled/version values, then run:
+# This mirrors `./devenv --all`: every built-in component is enabled.
+# Edit enabled/version values, then run:
 # ./devenv --config devenv.example.toml
+
+# System packages
 
 [[components]]
 id = "base-deps"
 enabled = true
+
+# Shells
 
 [[components]]
 id = "fish"
 enabled = true
 version = "latest"
 
+# Editor
+
 [[components]]
 id = "neovim"
 enabled = true
 version = "latest"
+
+# Languages
 
 [[components]]
 id = "rust"
@@ -35,6 +44,8 @@ version = "latest"
 id = "python"
 enabled = true
 version = "latest"
+
+# CLI tools
 
 [[components]]
 id = "fzf"
@@ -75,6 +86,8 @@ version = "latest"
 id = "zellij"
 enabled = true
 version = "latest"
+
+# Configurations
 
 [[components]]
 id = "config-bash"
