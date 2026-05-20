@@ -19,6 +19,15 @@ curl -fsSL https://github.com/nguyenvulong/devenv-linux/releases/latest/download
 ./devenv
 ```
 
+Common CLI helpers:
+
+```bash
+./devenv --help
+./devenv -h
+./devenv --version
+./devenv -v
+```
+
 After installation, reload your shell:
 
 ```bash

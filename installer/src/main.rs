@@ -29,6 +29,14 @@ use registry::{Category, Component, InstallStatus, SelectionState};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = std::env::args().collect();
+    if let Some(helper) = cli_helper(&args) {
+        match helper {
+            CliHelper::Help => print_help(),
+            CliHelper::Version => print_version(),
+        }
+        return Ok(());
+    }
+
     if let Some(config_path) = headless_config_path(&args)? {
         return run_headless_config(config_path);
     }
@@ -73,6 +81,42 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     Ok(())
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum CliHelper {
+    Help,
+    Version,
+}
+
+fn cli_helper(args: &[String]) -> Option<CliHelper> {
+    args.iter().skip(1).find_map(|arg| match arg.as_str() {
+        "--help" | "-h" => Some(CliHelper::Help),
+        "--version" | "-v" => Some(CliHelper::Version),
+        _ => None,
+    })
+}
+
+fn print_help() {
+    println!(
+        "\
+devenv-linux {}
+
+Usage:
+  devenv [OPTIONS]
+
+Options:
+      --all              Install every built-in component
+  -c, --config <PATH>    Install enabled components from a TOML config
+  -h, --help             Print help
+  -v, --version          Print version
+",
+        env!("CARGO_PKG_VERSION")
+    );
+}
+
+fn print_version() {
+    println!("devenv {}", env!("CARGO_PKG_VERSION"));
 }
 
 fn headless_config_path(args: &[String]) -> Result<Option<PathBuf>, Box<dyn Error>> {
@@ -447,7 +491,7 @@ fn collect_uninstall_mise_components(components: &[Component]) -> Vec<Component>
 
 #[cfg(test)]
 mod tests {
-    use super::{InstallPlan, headless_config_path};
+    use super::{CliHelper, InstallPlan, cli_helper, headless_config_path};
     use crate::registry::{Category, Component, Group, SelectionState};
     use std::path::PathBuf;
 
@@ -566,5 +610,34 @@ mod tests {
         let args = vec!["devenv".to_string(), "--config".to_string()];
 
         assert!(headless_config_path(&args).is_err());
+    }
+
+    #[test]
+    fn cli_helper_should_parse_help_flags() {
+        for flag in ["--help", "-h"] {
+            let args = vec!["devenv".to_string(), flag.to_string()];
+
+            assert_eq!(cli_helper(&args), Some(CliHelper::Help));
+        }
+    }
+
+    #[test]
+    fn cli_helper_should_parse_version_flags() {
+        for flag in ["--version", "-v"] {
+            let args = vec!["devenv".to_string(), flag.to_string()];
+
+            assert_eq!(cli_helper(&args), Some(CliHelper::Version));
+        }
+    }
+
+    #[test]
+    fn cli_helper_should_prefer_help_over_later_install_args() {
+        let args = vec![
+            "devenv".to_string(),
+            "--help".to_string(),
+            "--all".to_string(),
+        ];
+
+        assert_eq!(cli_helper(&args), Some(CliHelper::Help));
     }
 }
