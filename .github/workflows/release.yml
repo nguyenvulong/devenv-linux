@@ -93,7 +93,7 @@ jobs:
           echo "Packaged: $ARCHIVE ($(du -sh "$ARCHIVE" | cut -f1))"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: devenv-${{ matrix.arch }}
           path: ${{ matrix.arch }}.tar.xz
@@ -111,7 +111,7 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: dist/
           merge-multiple: true
@@ -120,7 +120,7 @@ jobs:
         run: ls -lh dist/
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: v${{ needs.validate.outputs.version }}
           tag_name: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', needs.validate.outputs.version) || github.ref_name }}

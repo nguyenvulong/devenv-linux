@@ -45,12 +45,13 @@ devenv-linux/
 ## Installer Flow
 
 1. `install.sh` detects architecture, downloads the latest release binary, extracts it, and runs `./devenv`.
-2. `main.rs` enters full headless mode when `--all`, `CI=true`, or `INSTALLER_ALL=1` is set.
-3. `main.rs` enters config-driven headless mode when `--config <path>`, `--config=<path>`, or `-c <path>` is set.
-4. Config-driven headless mode reads TOML from `headless_config.rs`, selects only enabled component IDs, and applies pinned versions only to `mise` tools.
-5. The TUI loads the component list, detects already-installed tools, and loads the searchable `mise` manifest.
-6. When installation starts, `sudo -v` runs in the normal terminal only if selected system packages need it.
-7. Installation runs in 3 phases:
+2. `main.rs` prints helper output and exits for `--help`/`-h` and `--version`/`-v`.
+3. `main.rs` enters full headless mode when `--all`, `CI=true`, or `INSTALLER_ALL=1` is set.
+4. `main.rs` enters config-driven headless mode when `--config <path>`, `--config=<path>`, or `-c <path>` is set.
+5. Config-driven headless mode reads TOML from `headless_config.rs`, selects only enabled component IDs, and applies pinned versions only to `mise` tools.
+6. The TUI loads the component list, detects already-installed tools, and loads the searchable `mise` manifest.
+7. When installation starts, `sudo -v` runs in the normal terminal only if selected system packages need it.
+8. Installation runs in 3 phases:
    - system packages
    - mise tools
    - configurations
@@ -83,6 +84,8 @@ bash install.sh
 cd installer
 cargo build --release
 ./target/release/devenv
+./target/release/devenv --help
+./target/release/devenv --version
 ./target/release/devenv --config ../devenv.example.toml
 
 cargo test
