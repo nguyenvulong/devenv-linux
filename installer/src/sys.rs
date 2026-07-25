@@ -17,19 +17,6 @@ pub struct CommandResult {
     pub stderr: String,
 }
 
-pub fn run_cmd(cmd: &str, args: &[&str]) -> Result<CommandResult> {
-    let output = Command::new(cmd)
-        .args(args)
-        .output()
-        .with_context(|| format!("failed to execute process: {cmd} {args:?}"))?;
-
-    Ok(CommandResult {
-        success: output.status.success(),
-        _stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-    })
-}
-
 pub fn run_cmd_streaming<F>(cmd: &str, args: &[&str], mut log: F) -> Result<CommandResult>
 where
     F: FnMut(&str) + Send + 'static,
@@ -110,20 +97,6 @@ pub fn get_distro() -> DistroFamily {
     parse_distro(&os_release)
 }
 
-pub fn get_mise_tool_version(tool: &str) -> Option<String> {
-    if !check_command_exists("mise") {
-        return None;
-    }
-
-    let out = Command::new("mise").args(["ls", tool]).output().ok()?;
-    if !out.status.success() {
-        return None;
-    }
-
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    parse_mise_tool_version(tool, &stdout)
-}
-
 pub fn get_command_version(cmd: &str, args: &[&str]) -> Option<String> {
     if !check_command_exists(cmd) {
         return None;
@@ -158,19 +131,6 @@ fn parse_distro(os_release: &str) -> DistroFamily {
     }
 }
 
-fn parse_mise_tool_version(tool: &str, stdout: &str) -> Option<String> {
-    for line in stdout.lines() {
-        let mut parts = line.split_whitespace();
-        let tool_name = parts.next()?;
-        let version = parts.next()?;
-        if tool_name == tool && !version.starts_with('(') {
-            return Some(version.to_string());
-        }
-    }
-
-    None
-}
-
 fn parse_command_version_output(stdout: &str, stderr: &str) -> Option<String> {
     let combined = format!("{stdout}\n{stderr}");
     let first_line = combined.lines().find(|line| !line.trim().is_empty())?;
@@ -196,9 +156,7 @@ fn parse_command_version_output(stdout: &str, stderr: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        DistroFamily, parse_command_version_output, parse_distro, parse_mise_tool_version,
-    };
+    use super::{DistroFamily, parse_command_version_output, parse_distro};
 
     #[test]
     fn parse_distro_should_detect_debian_like_distributions() {
@@ -212,23 +170,6 @@ mod tests {
         let os_release = "ID=fedora\nID_LIKE=fedora\n";
 
         assert_eq!(parse_distro(os_release), DistroFamily::RedHat);
-    }
-
-    #[test]
-    fn parse_mise_tool_version_should_return_matching_tool_version() {
-        let output = "rust 1.85.0 ~/.config/mise/config.toml\nnode 22.0.0 (missing)\n";
-
-        assert_eq!(
-            parse_mise_tool_version("rust", output),
-            Some("1.85.0".to_string())
-        );
-    }
-
-    #[test]
-    fn parse_mise_tool_version_should_ignore_missing_placeholders() {
-        let output = "rust (missing) ~/.config/mise/config.toml\n";
-
-        assert_eq!(parse_mise_tool_version("rust", output), None);
     }
 
     #[test]

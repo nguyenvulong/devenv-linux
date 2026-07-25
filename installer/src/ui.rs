@@ -1,5 +1,5 @@
 use crate::app::{App, Screen};
-use crate::registry::{Group, InstallStatus, SelectionState};
+use crate::registry::{ComponentAction, ComponentOutcome, Group, InstallPlan, ObservedState};
 use crate::theme;
 use ratatui::{
     Frame,
@@ -13,6 +13,7 @@ use std::sync::atomic::Ordering;
 pub fn draw(f: &mut Frame, app: &mut App) {
     match app.screen {
         Screen::Selection => draw_selection(f, app),
+        Screen::Review => draw_review(f, app),
         Screen::Installing => draw_installing(f, app),
         Screen::Report => draw_report(f, app),
         Screen::Search => draw_search(f, app),
@@ -63,29 +64,15 @@ fn draw_selection(f: &mut Frame, app: &mut App) {
             row_to_component.push(None);
         }
 
-        let prefix = match c.state {
-            SelectionState::Selected => "[✓] ",
-            SelectionState::Unselected => {
-                if matches!(c.status, InstallStatus::Installed(_))
-                    && matches!(c.category, crate::registry::Category::Mise(_))
-                {
-                    "[✗] "
-                } else {
-                    "[ ] "
-                }
-            }
+        let prefix = match c.action {
+            ComponentAction::Keep => "[=] ",
+            ComponentAction::Install => "[+] ",
+            ComponentAction::Deactivate => "[-] ",
         };
-        let prefix_style = match c.state {
-            SelectionState::Selected => theme::selection_selected_style(),
-            SelectionState::Unselected => {
-                if matches!(c.status, InstallStatus::Installed(_))
-                    && matches!(c.category, crate::registry::Category::Mise(_))
-                {
-                    theme::selection_uninstall_style()
-                } else {
-                    theme::selection_unselected_style()
-                }
-            }
+        let prefix_style = match c.action {
+            ComponentAction::Keep => theme::selection_unselected_style(),
+            ComponentAction::Install => theme::selection_selected_style(),
+            ComponentAction::Deactivate => theme::selection_uninstall_style(),
         };
 
         // Simplified list line (description goes to details pane)
@@ -151,19 +138,27 @@ fn draw_selection(f: &mut Frame, app: &mut App) {
             ]));
         }
 
-        let status_text = match &c.status {
-            InstallStatus::NotInstalled => "Not Installed".to_string(),
-            InstallStatus::Installed(v) => format!("Installed ({})", v),
-            _ => "Unknown".to_string(),
-        };
-        let status_color = match &c.status {
-            InstallStatus::NotInstalled => theme::COLOR_MUTED,
-            InstallStatus::Installed(_) => theme::COLOR_SUCCESS,
-            _ => theme::COLOR_WARNING,
+        let status_color = match &c.observed {
+            ObservedState::Missing => theme::COLOR_MUTED,
+            ObservedState::PathDetected(_)
+            | ObservedState::ExistingConfig
+            | ObservedState::MiseGlobal { .. } => theme::COLOR_SUCCESS,
+            ObservedState::Unknown => theme::COLOR_WARNING,
         };
         details_text.push(Line::from(vec![
-            Span::styled("Status: ", theme::shortcut_key_style()),
-            Span::styled(status_text, Style::default().fg(status_color)),
+            Span::styled("Observed: ", theme::shortcut_key_style()),
+            Span::styled(c.observed_label(), Style::default().fg(status_color)),
+        ]));
+        details_text.push(Line::from(vec![
+            Span::styled("Action: ", theme::shortcut_key_style()),
+            Span::styled(
+                c.action_label(),
+                Style::default().fg(match c.action {
+                    ComponentAction::Keep => theme::COLOR_MUTED,
+                    ComponentAction::Install => theme::COLOR_SUCCESS,
+                    ComponentAction::Deactivate => theme::COLOR_ERROR,
+                }),
+            ),
         ]));
 
         let details = Paragraph::new(details_text).block(theme::default_block().title(" Details "));
@@ -175,30 +170,132 @@ fn draw_selection(f: &mut Frame, app: &mut App) {
         Line::from(vec![
             Span::styled(" Navigate ", theme::shortcut_key_style()),
             Span::raw("↑/↓  j/k   "),
+            Span::styled(" Install ", theme::success_text_style()),
+            Span::raw("i   "),
+            Span::styled(" Keep ", theme::shortcut_key_style()),
+            Span::raw("u   "),
+            Span::styled(" Deactivate ", theme::selection_uninstall_style()),
+            Span::raw("d   "),
             Span::styled(" Toggle ", theme::shortcut_key_style()),
-            Span::raw("<Space>   "),
-            Span::styled(" Select All ", theme::shortcut_key_style()),
-            Span::raw("a   "),
-            Span::styled(" Deselect All ", theme::shortcut_key_style()),
-            Span::raw("n"),
+            Span::raw("<Space>"),
         ]),
         Line::from(vec![
+            Span::styled(" Install all ", theme::success_text_style()),
+            Span::raw("a   "),
+            Span::styled(" Keep all ", theme::shortcut_key_style()),
+            Span::raw("n   "),
             Span::styled(
-                " Search Registry ",
+                " Search ",
                 theme::shortcut_action_style(theme::COLOR_HIGHLIGHT),
             ),
             Span::raw("/   "),
-            Span::styled(" Install ", theme::success_text_style()),
+            Span::styled(" Review ", theme::success_text_style()),
             Span::raw("<Enter>   "),
             Span::styled(" Quit ", theme::shortcut_action_style(theme::COLOR_ERROR)),
-            Span::raw("q   "),
-            Span::styled(" [✗] ", theme::selection_uninstall_style()),
-            Span::raw("= uninstall"),
+            Span::raw("q"),
         ]),
+        Line::from(app.notice.clone().unwrap_or_else(|| {
+            " [=] Keep   [+] Install/update/reinstall   [-] Deactivate".to_string()
+        })),
     ];
 
     let help = Paragraph::new(help_text).block(theme::default_block().title(" Shortcuts "));
     f.render_widget(help, chunks[2]);
+}
+
+fn draw_review(f: &mut Frame, app: &App) {
+    let plan = InstallPlan::from_components(&app.components);
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Min(6),
+            Constraint::Length(5),
+            Constraint::Length(3),
+        ])
+        .split(f.area());
+
+    let title = Paragraph::new(" Review planned changes ")
+        .style(theme::title_style())
+        .block(theme::default_block());
+    f.render_widget(title, chunks[0]);
+
+    let rows = app
+        .components
+        .iter()
+        .filter(|component| component.action != ComponentAction::Keep)
+        .map(|component| {
+            let color = match component.action {
+                ComponentAction::Install => theme::COLOR_SUCCESS,
+                ComponentAction::Deactivate => theme::COLOR_ERROR,
+                ComponentAction::Keep => theme::COLOR_MUTED,
+            };
+            Row::new(vec![
+                Span::styled(
+                    component.name.clone(),
+                    Style::default().add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(component.action_label(), Style::default().fg(color)),
+                Span::raw(component.observed_label()),
+            ])
+        })
+        .collect::<Vec<Row>>();
+
+    let table = Table::new(
+        rows,
+        [
+            Constraint::Length(25),
+            Constraint::Length(18),
+            Constraint::Min(30),
+        ],
+    )
+    .header(
+        Row::new(vec!["Component", "Planned action", "Current state"])
+            .style(Style::default().add_modifier(Modifier::BOLD))
+            .bottom_margin(1),
+    )
+    .block(theme::default_block().title(format!(
+        " {} mutation(s) | {} kept ",
+        plan.mutation_count(),
+        plan.kept_count
+    )))
+    .column_spacing(2);
+    f.render_widget(table, chunks[1]);
+
+    let mut notes = Vec::new();
+    if plan.needs_mise_install() {
+        notes.push(Line::from(vec![
+            Span::styled("Prerequisite: ", theme::shortcut_key_style()),
+            Span::raw("mise will be installed if it is missing."),
+        ]));
+    }
+    if plan.needs_sudo() {
+        notes.push(Line::from(vec![
+            Span::styled("Privilege: ", theme::shortcut_key_style()),
+            Span::raw("sudo authentication follows confirmation."),
+        ]));
+    }
+    if plan.replaces_existing_nvim_config() {
+        notes.push(Line::from(Span::styled(
+            "Warning: the existing Neovim config will be replaced after staging and backed up.",
+            Style::default().fg(theme::COLOR_WARNING),
+        )));
+    }
+    if notes.is_empty() {
+        notes.push(Line::from(
+            "No implicit prerequisites or replacement warnings.",
+        ));
+    }
+    f.render_widget(
+        Paragraph::new(notes).block(theme::default_block().title(" Notes ")),
+        chunks[2],
+    );
+
+    f.render_widget(
+        Paragraph::new(" <Enter> Confirm and execute    <Esc> Back to selection ")
+            .block(theme::default_block()),
+        chunks[3],
+    );
 }
 
 fn draw_installing(f: &mut Frame, app: &mut App) {
@@ -273,56 +370,72 @@ fn draw_report(f: &mut Frame, app: &mut App) {
         .split(f.area());
 
     let header_text = Paragraph::new(Span::styled(
-        " Installation Complete! ",
+        " Execution complete ",
         theme::success_text_style(),
     ))
     .block(theme::default_block());
     f.render_widget(header_text, chunks[0]);
 
-    let mut installed_count = 0;
-    let mut skipped_count = 0;
+    let outcomes = app
+        .outcomes
+        .lock()
+        .map(|outcomes| outcomes.clone())
+        .unwrap_or_default();
+    let mut succeeded_count = 0;
+    let mut failed_count = 0;
+    let mut kept_count = 0;
     let mut rows: Vec<Row> = Vec::new();
 
-    for c in &app.components {
-        let (action, status_msg, color) = match c.state {
-            SelectionState::Unselected => {
-                if matches!(c.status, InstallStatus::Installed(_))
-                    && matches!(c.category, crate::registry::Category::Mise(_))
-                {
-                    installed_count += 1;
-                    ("Uninstall", "Removed", theme::COLOR_ERROR)
-                } else {
-                    skipped_count += 1;
-                    ("Skip", "Not Selected", theme::COLOR_MUTED)
-                }
+    for component in &app.components {
+        let outcome = outcomes
+            .get(&component.id)
+            .cloned()
+            .unwrap_or(ComponentOutcome::Pending);
+        let (status, color) = match outcome {
+            ComponentOutcome::Succeeded => {
+                succeeded_count += 1;
+                ("Succeeded".to_string(), theme::COLOR_SUCCESS)
             }
-            SelectionState::Selected => {
-                installed_count += 1;
-                match &c.status {
-                    InstallStatus::Installed(_) => {
-                        ("Install", "Installed / Updated", theme::COLOR_SUCCESS)
-                    }
-                    _ => ("Process", "Processed", theme::COLOR_SUCCESS),
-                }
+            ComponentOutcome::Failed(error) => {
+                failed_count += 1;
+                (format!("Failed: {error}"), theme::COLOR_ERROR)
+            }
+            ComponentOutcome::AlreadyConfigured => {
+                succeeded_count += 1;
+                ("Already configured".to_string(), theme::COLOR_SUCCESS)
+            }
+            ComponentOutcome::Deactivated => {
+                succeeded_count += 1;
+                ("Deactivated".to_string(), theme::COLOR_SUCCESS)
+            }
+            ComponentOutcome::Kept => {
+                kept_count += 1;
+                ("Kept".to_string(), theme::COLOR_MUTED)
+            }
+            ComponentOutcome::Pending => {
+                failed_count += 1;
+                (
+                    "Failed: no outcome recorded".to_string(),
+                    theme::COLOR_WARNING,
+                )
             }
         };
 
         rows.push(Row::new(vec![
             Span::styled(
-                c.name.clone(),
+                component.name.clone(),
                 Style::default().add_modifier(Modifier::BOLD),
             ),
-            Span::styled(action.to_string(), Style::default().fg(color)),
-            Span::styled(status_msg.to_string(), Style::default().fg(color)),
+            Span::styled(component.action_label(), Style::default().fg(color)),
+            Span::styled(status, Style::default().fg(color)),
         ]));
     }
 
     let summary_title = format!(
-        " Summary Report [ {} Processed | {} Skipped ] ",
-        installed_count, skipped_count
+        " Summary [ {succeeded_count} succeeded | {failed_count} failed | {kept_count} kept ] "
     );
 
-    let table_header = Row::new(vec!["Tool Name", "Action", "Status"])
+    let table_header = Row::new(vec!["Component", "Requested action", "Outcome"])
         .style(Style::default().add_modifier(Modifier::BOLD))
         .bottom_margin(1);
 
@@ -330,7 +443,7 @@ fn draw_report(f: &mut Frame, app: &mut App) {
         rows,
         [
             Constraint::Length(25),
-            Constraint::Length(15),
+            Constraint::Length(18),
             Constraint::Min(30),
         ],
     )

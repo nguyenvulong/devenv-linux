@@ -1,4 +1,4 @@
-use crate::registry::{Category, Component, SelectionState};
+use crate::registry::{Category, Component, ComponentAction};
 use anyhow::{Context, Result, bail};
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
@@ -33,7 +33,7 @@ pub(crate) fn components_from_str(raw: &str) -> Result<Vec<Component>> {
 
 fn apply_config(config: HeadlessConfig, components: &mut [Component]) -> Result<()> {
     for component in components.iter_mut() {
-        component.state = SelectionState::Unselected;
+        component.action = ComponentAction::Keep;
         component.mise_version = None;
     }
 
@@ -55,7 +55,7 @@ fn apply_config(config: HeadlessConfig, components: &mut [Component]) -> Result<
         let component = &mut components[index];
 
         if configured.enabled {
-            component.state = SelectionState::Selected;
+            component.action = ComponentAction::Install;
         }
 
         let Some(version) = configured.version else {
@@ -82,7 +82,7 @@ fn apply_config(config: HeadlessConfig, components: &mut [Component]) -> Result<
 #[cfg(test)]
 mod tests {
     use super::components_from_str;
-    use crate::registry::{Category, SelectionState};
+    use crate::registry::{Category, ComponentAction};
 
     fn selected_component<'a>(
         components: &'a [crate::registry::Component],
@@ -110,16 +110,16 @@ mod tests {
         .expect("config should parse");
 
         assert_eq!(
-            selected_component(&components, "rust").state,
-            SelectionState::Selected
+            selected_component(&components, "rust").action,
+            ComponentAction::Install
         );
         assert_eq!(
-            selected_component(&components, "node").state,
-            SelectionState::Unselected
+            selected_component(&components, "node").action,
+            ComponentAction::Keep
         );
         assert_eq!(
-            selected_component(&components, "go").state,
-            SelectionState::Unselected
+            selected_component(&components, "go").action,
+            ComponentAction::Keep
         );
     }
 
@@ -236,7 +236,7 @@ mod tests {
         assert!(
             components
                 .iter()
-                .all(|component| component.state == SelectionState::Selected)
+                .all(|component| component.action == ComponentAction::Install)
         );
     }
 }

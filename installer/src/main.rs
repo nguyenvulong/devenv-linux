@@ -25,7 +25,7 @@ mod theme;
 mod ui;
 
 use app::{App, Screen};
-use registry::{Category, Component, InstallStatus, SelectionState};
+use registry::{Component, ComponentAction, ComponentOutcome, InstallPlan};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = std::env::args().collect();
@@ -49,14 +49,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     if headless {
         return run_headless();
-    }
-
-    if !sys::check_command_exists("mise") {
-        let mise_path = installer::mise::mise_bin();
-        if mise_path == "mise" {
-            println!("Setting up package registry (installing mise)...");
-            let _ = installer::mise::install_mise(|_| {});
-        }
     }
 
     enable_raw_mode()?;
@@ -143,7 +135,7 @@ fn headless_config_path(args: &[String]) -> Result<Option<PathBuf>, Box<dyn Erro
 fn run_headless() -> Result<(), Box<dyn Error>> {
     let mut components = registry::get_all_components();
     for c in &mut components {
-        c.state = registry::SelectionState::Selected;
+        c.action = ComponentAction::Install;
     }
 
     run_headless_components(components, "--all mode")
@@ -162,9 +154,7 @@ fn run_headless_components(components: Vec<Component>, mode: &str) -> Result<(),
     println!();
 
     let install_plan = InstallPlan::from_components(&components);
-    let needs_sudo = !install_plan.system.is_empty();
-
-    if needs_sudo {
+    if install_plan.needs_sudo() {
         println!("Some components require elevated privileges (sudo).");
         let status = Command::new("sudo").arg("-v").status()?;
         if !status.success() {
@@ -183,25 +173,40 @@ fn run_headless_components(components: Vec<Component>, mode: &str) -> Result<(),
     }
 
     println!("\n>>> Phase 2: Mise Tools");
-    let mise_comps: Vec<&registry::Component> = install_plan.mise.iter().collect();
-    if !mise_comps.is_empty() {
+    let mise_ready = if install_plan.needs_mise_install() {
         match installer::mise::install_mise(|msg| println!("{}", msg)) {
-            Err(e) => eprintln!("[ERROR] mise install: {}", e),
-            Ok(()) => {
-                if let Err(e) =
-                    installer::mise::activate_mise_tools(&mise_comps, |msg| println!("{}", msg))
-                {
-                    eprintln!("[ERROR] mise tools: {}", e);
-                }
+            Ok(()) => true,
+            Err(error) => {
+                eprintln!("[ERROR] mise prerequisite: {error}");
+                false
             }
+        }
+    } else {
+        true
+    };
+
+    for component in &install_plan.mise {
+        if !mise_ready {
+            eprintln!("[ERROR] mise tool {}: mise is unavailable", component.id);
+            continue;
+        }
+        if let Err(error) =
+            installer::mise::activate_mise_tools(&[component], |message| println!("{message}"))
+        {
+            eprintln!("[ERROR] mise tool {}: {error}", component.id);
         }
     }
 
     println!("\n>>> Phase 3: Configurations");
-    let cfg_comps: Vec<&registry::Component> = install_plan.configs.iter().collect();
-    for cfg in cfg_comps {
-        if let Err(e) = installer::config::setup_config(cfg, |msg| println!("{}", msg)) {
-            eprintln!("[ERROR] config {}: {}", cfg.id, e);
+    for component in &install_plan.configs {
+        if config_needs_mise(component) && !mise_ready {
+            eprintln!("[ERROR] config {}: mise is unavailable", component.id);
+            continue;
+        }
+        if let Err(error) =
+            installer::config::setup_config(component, |message| println!("{message}"))
+        {
+            eprintln!("[ERROR] config {}: {error}", component.id);
         }
     }
 
@@ -223,11 +228,6 @@ where
         if app.screen == Screen::Installing {
             let done = app.install_done.load(Ordering::Acquire);
             if done {
-                for c in &mut app.components {
-                    if c.state == registry::SelectionState::Selected {
-                        c.status = registry::InstallStatus::Installed("Done".to_string());
-                    }
-                }
                 app.screen = Screen::Report;
             }
             continue;
@@ -236,34 +236,40 @@ where
         if event::poll(Duration::from_millis(100))?
             && let Event::Key(key) = event::read()?
         {
+            if app.screen == Screen::Selection && handle_selection_action_key(app, key.code) {
+                continue;
+            }
+
             match app.screen {
                 Screen::Selection => match key.code {
                     KeyCode::Char('q') | KeyCode::Esc => app.should_quit = true,
                     KeyCode::Up | KeyCode::Char('k') => app.previous(),
                     KeyCode::Down | KeyCode::Char('j') => app.next(),
-                    KeyCode::Char(' ') => app.toggle_selection(),
-                    KeyCode::Char('a') => {
-                        for c in &mut app.components {
-                            c.state = registry::SelectionState::Selected;
-                        }
-                    }
-                    KeyCode::Char('n') => {
-                        for c in &mut app.components {
-                            c.state = registry::SelectionState::Unselected;
-                        }
-                    }
                     KeyCode::Char('/') => {
                         app.search_query.clear();
                         app.update_search();
                         app.screen = Screen::Search;
                     }
                     KeyCode::Enter => {
-                        if app.has_selected_system_packages()
-                            && !ensure_sudo_credentials_for_install()?
-                        {
+                        let plan = InstallPlan::from_components(&app.components);
+                        if plan.is_empty() {
+                            app.notice = Some("No changes selected.".to_string());
+                        } else {
+                            app.notice = None;
+                            app.screen = Screen::Review;
+                        }
+                    }
+                    _ => {}
+                },
+                Screen::Review => match key.code {
+                    KeyCode::Esc => app.screen = Screen::Selection,
+                    KeyCode::Enter => {
+                        let plan = InstallPlan::from_components(&app.components);
+                        if plan.needs_sudo() && !ensure_sudo_credentials_for_install()? {
                             continue;
                         }
 
+                        app.prepare_installation();
                         app.screen = Screen::Installing;
                         spawn_installation(app);
                     }
@@ -297,6 +303,23 @@ where
     }
 }
 
+fn handle_selection_action_key(app: &mut App, key: KeyCode) -> bool {
+    match key {
+        KeyCode::Char('i') => app.set_current_action(ComponentAction::Install),
+        KeyCode::Char('u') => app.set_current_action(ComponentAction::Keep),
+        KeyCode::Char('d') => app.set_current_action(ComponentAction::Deactivate),
+        KeyCode::Char(' ') => app.toggle_current(),
+        KeyCode::Char('a') => app.install_all(),
+        KeyCode::Char('n') => app.keep_all(),
+        _ => return false,
+    }
+    true
+}
+
+fn config_needs_mise(component: &Component) -> bool {
+    matches!(component.id.as_str(), "config-bash" | "config-fish")
+}
+
 fn ensure_sudo_credentials_for_install() -> Result<bool, Box<dyn Error>> {
     if has_cached_sudo_credentials()? {
         start_sudo_keepalive();
@@ -305,7 +328,7 @@ fn ensure_sudo_credentials_for_install() -> Result<bool, Box<dyn Error>> {
 
     suspend_tui()?;
 
-    println!("System packages are selected and require sudo.");
+    println!("A planned system-package installation requires sudo.");
     println!("Please enter your sudo password to continue.");
     println!();
 
@@ -372,6 +395,7 @@ fn spawn_installation(app: &mut App) {
     let logs = Arc::clone(&app.logs);
     let done_flag = Arc::clone(&app.install_done);
     let install_index = Arc::clone(&app.install_index);
+    let outcomes = Arc::clone(&app.outcomes);
     let install_plan = InstallPlan::from_components(&app.components);
 
     let make_log = move |logs: Arc<Mutex<Vec<String>>>| {
@@ -387,34 +411,79 @@ fn spawn_installation(app: &mut App) {
         push_log(&logs, ">>> Phase 1: System Packages");
 
         let sys_comps: Vec<&Component> = install_plan.system.iter().collect();
-        if let Err(e) =
-            installer::system::install_system_packages(&sys_comps, make_log(logs.clone()))
-        {
-            push_log(&logs, format!("[ERROR] System packages: {}", e));
+        let system_result =
+            installer::system::install_system_packages(&sys_comps, make_log(logs.clone()));
+        match system_result {
+            Ok(()) => {
+                for component in &install_plan.system {
+                    set_outcome(&outcomes, &component.id, ComponentOutcome::Succeeded);
+                }
+            }
+            Err(error) => {
+                push_log(&logs, format!("[ERROR] System packages: {error}"));
+                for component in &install_plan.system {
+                    set_outcome(
+                        &outcomes,
+                        &component.id,
+                        ComponentOutcome::Failed(error.to_string()),
+                    );
+                }
+            }
         }
 
         install_index.store(1, Ordering::Relaxed);
         push_log(&logs, "\n>>> Phase 2: Mise Tools");
 
-        let uninstall_comps: Vec<&Component> = install_plan.uninstall_mise.iter().collect();
-        if !uninstall_comps.is_empty() {
-            let res =
-                installer::mise::deactivate_mise_tools(&uninstall_comps, make_log(logs.clone()));
-            if let Err(e) = res {
-                push_log(&logs, format!("[ERROR] mise tools removal: {}", e));
+        for component in &install_plan.deactivate_mise {
+            match installer::mise::deactivate_mise_tools(&[component], make_log(logs.clone())) {
+                Ok(()) => set_outcome(&outcomes, &component.id, ComponentOutcome::Deactivated),
+                Err(error) => {
+                    push_log(
+                        &logs,
+                        format!("[ERROR] deactivate {}: {error}", component.id),
+                    );
+                    set_outcome(
+                        &outcomes,
+                        &component.id,
+                        ComponentOutcome::Failed(error.to_string()),
+                    );
+                }
             }
         }
 
-        let mise_comps: Vec<&Component> = install_plan.mise.iter().collect();
-        if !mise_comps.is_empty() {
+        let mise_ready = if install_plan.needs_mise_install() {
             match installer::mise::install_mise(make_log(logs.clone())) {
-                Err(e) => push_log(&logs, format!("[ERROR] mise install: {}", e)),
-                Ok(()) => {
-                    if let Err(e) =
-                        installer::mise::activate_mise_tools(&mise_comps, make_log(logs.clone()))
-                    {
-                        push_log(&logs, format!("[ERROR] mise tools: {}", e));
-                    }
+                Ok(()) => true,
+                Err(error) => {
+                    push_log(&logs, format!("[ERROR] mise prerequisite: {error}"));
+                    false
+                }
+            }
+        } else {
+            true
+        };
+
+        for component in &install_plan.mise {
+            if !mise_ready {
+                set_outcome(
+                    &outcomes,
+                    &component.id,
+                    ComponentOutcome::Failed("mise prerequisite failed".to_string()),
+                );
+                continue;
+            }
+            match installer::mise::activate_mise_tools(&[component], make_log(logs.clone())) {
+                Ok(()) => set_outcome(&outcomes, &component.id, ComponentOutcome::Succeeded),
+                Err(error) => {
+                    push_log(
+                        &logs,
+                        format!("[ERROR] mise tool {}: {error}", component.id),
+                    );
+                    set_outcome(
+                        &outcomes,
+                        &component.id,
+                        ComponentOutcome::Failed(error.to_string()),
+                    );
                 }
             }
         }
@@ -422,10 +491,33 @@ fn spawn_installation(app: &mut App) {
         install_index.store(2, Ordering::Relaxed);
         push_log(&logs, "\n>>> Phase 3: Configurations");
 
-        let cfg_comps: Vec<&Component> = install_plan.configs.iter().collect();
-        for cfg in cfg_comps {
-            if let Err(e) = installer::config::setup_config(cfg, make_log(logs.clone())) {
-                push_log(&logs, format!("[ERROR] config {}: {}", cfg.id, e));
+        for component in &install_plan.configs {
+            if config_needs_mise(component) && !mise_ready {
+                set_outcome(
+                    &outcomes,
+                    &component.id,
+                    ComponentOutcome::Failed("mise prerequisite failed".to_string()),
+                );
+                continue;
+            }
+
+            match installer::config::setup_config(component, make_log(logs.clone())) {
+                Ok(installer::config::ConfigOutcome::Changed) => {
+                    set_outcome(&outcomes, &component.id, ComponentOutcome::Succeeded)
+                }
+                Ok(installer::config::ConfigOutcome::AlreadyConfigured) => set_outcome(
+                    &outcomes,
+                    &component.id,
+                    ComponentOutcome::AlreadyConfigured,
+                ),
+                Err(error) => {
+                    push_log(&logs, format!("[ERROR] config {}: {error}", component.id));
+                    set_outcome(
+                        &outcomes,
+                        &component.id,
+                        ComponentOutcome::Failed(error.to_string()),
+                    );
+                }
             }
         }
 
@@ -440,60 +532,99 @@ fn push_log(logs: &Arc<Mutex<Vec<String>>>, message: impl Into<String>) {
     }
 }
 
-struct InstallPlan {
-    system: Vec<Component>,
-    mise: Vec<Component>,
-    uninstall_mise: Vec<Component>,
-    configs: Vec<Component>,
-}
-
-impl InstallPlan {
-    fn from_components(components: &[Component]) -> Self {
-        Self {
-            system: collect_selected_components(components, |category| {
-                matches!(category, Category::SystemPackage)
-            }),
-            mise: collect_selected_components(components, |category| {
-                matches!(category, Category::Mise(_))
-            }),
-            uninstall_mise: collect_uninstall_mise_components(components),
-            configs: collect_selected_components(components, |category| {
-                matches!(category, Category::Config)
-            }),
-        }
+fn set_outcome(
+    outcomes: &Arc<Mutex<std::collections::HashMap<String, ComponentOutcome>>>,
+    component_id: &str,
+    outcome: ComponentOutcome,
+) {
+    if let Ok(mut outcomes) = outcomes.lock() {
+        outcomes.insert(component_id.to_string(), outcome);
     }
-}
-
-fn collect_selected_components(
-    components: &[Component],
-    predicate: impl Fn(&Category) -> bool,
-) -> Vec<Component> {
-    components
-        .iter()
-        .filter(|component| {
-            component.state == SelectionState::Selected && predicate(&component.category)
-        })
-        .cloned()
-        .collect()
-}
-
-fn collect_uninstall_mise_components(components: &[Component]) -> Vec<Component> {
-    components
-        .iter()
-        .filter(|component| {
-            component.state == SelectionState::Unselected
-                && matches!(component.category, Category::Mise(_))
-                && matches!(component.status, InstallStatus::Installed(_))
-        })
-        .cloned()
-        .collect()
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{CliHelper, InstallPlan, cli_helper, headless_config_path};
-    use crate::registry::{Category, Component, Group, SelectionState};
-    use std::path::PathBuf;
+    use super::{
+        CliHelper, InstallPlan, cli_helper, handle_selection_action_key, headless_config_path,
+    };
+    use crate::app::{App, Screen};
+    use crate::registry::{
+        Category, Component, ComponentAction, ComponentOutcome, Group, ObservedState,
+    };
+    use crossterm::event::KeyCode;
+    use std::{
+        collections::HashMap,
+        path::PathBuf,
+        sync::{
+            Arc, Mutex,
+            atomic::{AtomicBool, AtomicUsize},
+        },
+    };
+
+    fn action_test_app(component: Component) -> App {
+        let outcomes = HashMap::from([(component.id.clone(), ComponentOutcome::Kept)]);
+        App {
+            components: vec![component],
+            cursor: 0,
+            screen: Screen::Selection,
+            logs: Arc::new(Mutex::new(Vec::new())),
+            install_done: Arc::new(AtomicBool::new(false)),
+            install_index: Arc::new(AtomicUsize::new(0)),
+            outcomes: Arc::new(Mutex::new(outcomes)),
+            should_quit: false,
+            notice: None,
+            manifest_tools: Vec::new(),
+            search_query: String::new(),
+            search_results: Vec::new(),
+            search_cursor: 0,
+        }
+    }
+
+    fn action_test_component() -> Component {
+        let mut component = Component::new(
+            "rust",
+            "Rust",
+            "Rust programming language",
+            Category::Mise("rust".to_string()),
+            Group::Languages,
+            Some("rustc"),
+            &["--version"],
+        );
+        component.observed = ObservedState::MiseGlobal {
+            versions: vec!["stable".to_string()],
+        };
+        component
+    }
+
+    #[test]
+    fn selection_action_keys_should_map_to_explicit_actions() {
+        let cases = [
+            (KeyCode::Char('i'), ComponentAction::Install),
+            (KeyCode::Char('u'), ComponentAction::Keep),
+            (KeyCode::Char('d'), ComponentAction::Deactivate),
+        ];
+        let mut actual = Vec::new();
+
+        for (key, expected) in cases {
+            let mut app = action_test_app(action_test_component());
+            app.components[0].action = if expected == ComponentAction::Keep {
+                ComponentAction::Install
+            } else {
+                ComponentAction::Keep
+            };
+            assert!(handle_selection_action_key(&mut app, key));
+            actual.push(app.components[0].action);
+        }
+
+        assert_eq!(
+            actual,
+            vec![
+                ComponentAction::Install,
+                ComponentAction::Keep,
+                ComponentAction::Deactivate,
+            ]
+        );
+    }
 
     #[test]
     fn install_plan_should_separate_selected_system_packages() {
@@ -506,13 +637,13 @@ mod tests {
             None,
             &[],
         );
-        system.state = SelectionState::Selected;
+        system.action = ComponentAction::Install;
 
         let plan = InstallPlan::from_components(&[system]);
 
         assert_eq!(plan.system.len(), 1);
         assert!(plan.mise.is_empty());
-        assert!(plan.uninstall_mise.is_empty());
+        assert!(plan.deactivate_mise.is_empty());
         assert!(plan.configs.is_empty());
     }
 
@@ -527,7 +658,7 @@ mod tests {
             None,
             &[],
         );
-        system.state = SelectionState::Selected;
+        system.action = ComponentAction::Install;
 
         let mut mise = Component::new(
             "rust",
@@ -538,7 +669,7 @@ mod tests {
             Some("rustc"),
             &["--version"],
         );
-        mise.state = SelectionState::Selected;
+        mise.action = ComponentAction::Install;
 
         let mut config = Component::new(
             "config-fish",
@@ -549,13 +680,13 @@ mod tests {
             None,
             &[],
         );
-        config.state = SelectionState::Unselected;
+        config.action = ComponentAction::Keep;
 
         let plan = InstallPlan::from_components(&[system, mise, config]);
 
         assert_eq!(plan.system.len(), 1);
         assert_eq!(plan.mise.len(), 1);
-        assert!(plan.uninstall_mise.is_empty());
+        assert!(plan.deactivate_mise.is_empty());
         assert!(plan.configs.is_empty());
     }
 
@@ -570,7 +701,7 @@ mod tests {
             Some("rustc"),
             &["--version"],
         );
-        mise.state = SelectionState::Selected;
+        mise.action = ComponentAction::Install;
         mise.mise_version = Some("1.85.0".to_string());
 
         let plan = InstallPlan::from_components(&[mise]);
