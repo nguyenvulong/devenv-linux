@@ -1,5 +1,3 @@
-// std imports not needed here
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Group {
     System,
@@ -36,16 +34,29 @@ pub enum Category {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum InstallStatus {
-    Checking,
-    NotInstalled,
-    Installed(String),
+pub enum ObservedState {
+    Unknown,
+    Missing,
+    PathDetected(String),
+    ExistingConfig,
+    MiseGlobal { versions: Vec<String> },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SelectionState {
-    Selected,
-    Unselected,
+pub enum ComponentAction {
+    Keep,
+    Install,
+    Deactivate,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ComponentOutcome {
+    Pending,
+    Succeeded,
+    Failed(String),
+    AlreadyConfigured,
+    Deactivated,
+    Kept,
 }
 
 #[derive(Debug, Clone)]
@@ -58,8 +69,8 @@ pub struct Component {
     pub check_command: Option<String>,
     pub check_args: Vec<String>,
     pub mise_version: Option<String>,
-    pub state: SelectionState,
-    pub status: InstallStatus,
+    pub action: ComponentAction,
+    pub observed: ObservedState,
 }
 
 impl Component {
@@ -81,10 +92,132 @@ impl Component {
             check_command: check_command.map(|s| s.to_string()),
             check_args: check_args.iter().map(|&s| s.to_string()).collect(),
             mise_version: None,
-            state: SelectionState::Unselected,
-            status: InstallStatus::Checking,
+            action: ComponentAction::Keep,
+            observed: ObservedState::Unknown,
         }
     }
+
+    pub fn can_deactivate(&self) -> bool {
+        matches!(
+            (&self.category, &self.observed),
+            (Category::Mise(_), ObservedState::MiseGlobal { versions }) if !versions.is_empty()
+        )
+    }
+
+    pub fn set_action(&mut self, action: ComponentAction) -> bool {
+        if action == ComponentAction::Deactivate && !self.can_deactivate() {
+            return false;
+        }
+        self.action = action;
+        true
+    }
+
+    pub fn toggle_install(&mut self) {
+        self.action = match self.action {
+            ComponentAction::Keep => ComponentAction::Install,
+            ComponentAction::Install | ComponentAction::Deactivate => ComponentAction::Keep,
+        };
+    }
+
+    pub fn action_label(&self) -> &'static str {
+        match self.action {
+            ComponentAction::Keep => "Keep",
+            ComponentAction::Deactivate => "Deactivate",
+            ComponentAction::Install => match (&self.category, &self.observed) {
+                (Category::Mise(_), ObservedState::MiseGlobal { .. }) => "Update to latest",
+                (Category::Config, ObservedState::ExistingConfig) => "Reinstall",
+                _ => "Install",
+            },
+        }
+    }
+
+    pub fn observed_label(&self) -> String {
+        match &self.observed {
+            ObservedState::Unknown => "Unknown".to_string(),
+            ObservedState::Missing => "Not detected".to_string(),
+            ObservedState::PathDetected(version) => format!("Detected on PATH ({version})"),
+            ObservedState::ExistingConfig => "Existing configuration".to_string(),
+            ObservedState::MiseGlobal { versions } => {
+                format!("Globally managed by mise ({})", versions.join(", "))
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct InstallPlan {
+    pub system: Vec<Component>,
+    pub mise: Vec<Component>,
+    pub deactivate_mise: Vec<Component>,
+    pub configs: Vec<Component>,
+    pub kept_count: usize,
+}
+
+impl InstallPlan {
+    pub fn from_components(components: &[Component]) -> Self {
+        Self {
+            system: collect_components(components, ComponentAction::Install, |category| {
+                matches!(category, Category::SystemPackage)
+            }),
+            mise: collect_components(components, ComponentAction::Install, |category| {
+                matches!(category, Category::Mise(_))
+            }),
+            deactivate_mise: collect_components(
+                components,
+                ComponentAction::Deactivate,
+                |category| matches!(category, Category::Mise(_)),
+            ),
+            configs: collect_components(components, ComponentAction::Install, |category| {
+                matches!(category, Category::Config)
+            }),
+            kept_count: components
+                .iter()
+                .filter(|component| component.action == ComponentAction::Keep)
+                .count(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.system.is_empty()
+            && self.mise.is_empty()
+            && self.deactivate_mise.is_empty()
+            && self.configs.is_empty()
+    }
+
+    pub fn mutation_count(&self) -> usize {
+        self.system.len() + self.mise.len() + self.deactivate_mise.len() + self.configs.len()
+    }
+
+    pub fn needs_sudo(&self) -> bool {
+        !self.system.is_empty()
+    }
+
+    pub fn needs_mise_install(&self) -> bool {
+        !self.mise.is_empty()
+            || self
+                .configs
+                .iter()
+                .any(|component| matches!(component.id.as_str(), "config-bash" | "config-fish"))
+    }
+
+    pub fn replaces_existing_nvim_config(&self) -> bool {
+        self.configs.iter().any(|component| {
+            component.id == "config-nvim"
+                && matches!(component.observed, ObservedState::ExistingConfig)
+        })
+    }
+}
+
+fn collect_components(
+    components: &[Component],
+    action: ComponentAction,
+    predicate: impl Fn(&Category) -> bool,
+) -> Vec<Component> {
+    components
+        .iter()
+        .filter(|component| component.action == action && predicate(&component.category))
+        .cloned()
+        .collect()
 }
 
 pub fn get_all_components() -> Vec<Component> {
@@ -258,4 +391,125 @@ pub fn get_all_components() -> Vec<Component> {
             &[],
         ),
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn mise_component() -> Component {
+        Component::new(
+            "rust",
+            "Rust",
+            "Rust programming language",
+            Category::Mise("rust".to_string()),
+            Group::Languages,
+            Some("rustc"),
+            &["--version"],
+        )
+    }
+
+    fn config_component(id: &str) -> Component {
+        Component::new(
+            id,
+            id,
+            "configuration",
+            Category::Config,
+            Group::Configurations,
+            None,
+            &[],
+        )
+    }
+
+    #[test]
+    fn component_should_only_allow_deactivate_for_global_mise_tools() {
+        let mut component = mise_component();
+        component.observed = ObservedState::PathDetected("1.85.0".to_string());
+
+        assert!(!component.set_action(ComponentAction::Deactivate));
+    }
+
+    #[test]
+    fn component_should_allow_deactivate_for_global_mise_tools() {
+        let mut component = mise_component();
+        component.observed = ObservedState::MiseGlobal {
+            versions: vec!["stable".to_string()],
+        };
+
+        assert!(component.set_action(ComponentAction::Deactivate));
+    }
+
+    #[test]
+    fn empty_plan_should_keep_every_component() {
+        let components = get_all_components();
+
+        let plan = InstallPlan::from_components(&components);
+
+        assert!(plan.is_empty() && plan.kept_count == components.len());
+    }
+
+    #[test]
+    fn plan_should_request_sudo_only_for_system_install_actions() {
+        let mut component = Component::new(
+            "base-deps",
+            "Base Dependencies",
+            "system dependencies",
+            Category::SystemPackage,
+            Group::System,
+            None,
+            &[],
+        );
+        component.action = ComponentAction::Install;
+
+        assert!(InstallPlan::from_components(&[component]).needs_sudo());
+    }
+
+    #[test]
+    fn shell_config_should_add_implicit_mise_prerequisite() {
+        let mut component = config_component("config-bash");
+        component.action = ComponentAction::Install;
+
+        assert!(InstallPlan::from_components(&[component]).needs_mise_install());
+    }
+
+    #[test]
+    fn nvim_config_should_not_add_mise_prerequisite() {
+        let mut component = config_component("config-nvim");
+        component.action = ComponentAction::Install;
+
+        assert!(!InstallPlan::from_components(&[component]).needs_mise_install());
+    }
+
+    #[test]
+    fn review_should_warn_when_existing_nvim_config_will_be_replaced() {
+        let mut component = config_component("config-nvim");
+        component.action = ComponentAction::Install;
+        component.observed = ObservedState::ExistingConfig;
+
+        assert!(InstallPlan::from_components(&[component]).replaces_existing_nvim_config());
+    }
+
+    #[test]
+    fn install_action_should_describe_global_mise_tool_as_update() {
+        let mut component = mise_component();
+        component.action = ComponentAction::Install;
+        component.observed = ObservedState::MiseGlobal {
+            versions: vec!["1.85".to_string()],
+        };
+
+        assert_eq!(component.action_label(), "Update to latest");
+    }
+
+    #[test]
+    fn plan_should_partition_deactivation_separately_from_install() {
+        let mut component = mise_component();
+        component.observed = ObservedState::MiseGlobal {
+            versions: vec!["stable".to_string()],
+        };
+        component.action = ComponentAction::Deactivate;
+
+        let plan = InstallPlan::from_components(&[component]);
+
+        assert!(plan.mise.is_empty() && plan.deactivate_mise.len() == 1);
+    }
 }

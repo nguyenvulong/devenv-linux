@@ -35,6 +35,40 @@ source ~/.bashrc
 source ~/.config/fish/config.fish
 ```
 
+## Interactive Actions
+
+The interactive installer starts every component at **Keep**. Opening the TUI
+and pressing Enter without choosing an action does not write anything.
+
+Each component has one explicit desired action:
+
+- `[=]` **Keep** leaves the component unchanged.
+- `[+]` **Install** installs a missing component, updates a globally managed
+  mise tool to latest, or explicitly reruns an existing configuration.
+- `[-]` **Deactivate** removes each requested version from the global mise
+  configuration. It does not delete cached installations and never changes
+  local project configurations. This action is unavailable for PATH-only tools.
+
+Use `j`/`k` or the arrow keys to navigate. The action shortcuts are `i` for
+Install, `u` for Keep, and `d` for Deactivate. Space safely toggles Keep and
+Install; when the current action is Deactivate, Space returns it to Keep. Use
+`a` to Install all, `n` to Keep all, and `/` to add a tool from the mise
+registry with Install intent. There is no bulk-deactivate shortcut.
+
+Enter opens a review containing only planned mutations, the number of kept
+components, implicit prerequisites, and replacement warnings. Enter again
+confirms execution; Esc returns to selection. Sudo is requested only after
+confirmation and only when a planned system-package installation needs it.
+
+Mise is installed lazily when an Install action needs a mise tool or Bash/Fish
+activation. Deactivation uses the versions found in the global mise config and
+leaves installed caches in place.
+
+Explicitly reinstalling the LazyVim configuration is staged before the live
+configuration is touched. Once staging succeeds, the existing directory is
+renamed to `~/.config/nvim.bak`, then `.bak.1`, `.bak.2`, and so on. If the
+final swap fails, the original configuration is restored.
+
 ## Non-Interactive Install Modes
 
 ### Install Everything
