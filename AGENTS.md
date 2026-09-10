@@ -114,4 +114,6 @@ cargo clippy --all-targets --all-features --locked -- -D warnings
 - `dev`: active development
 - `main`: stable releases
 
+Before releasing, merge `origin/main` into `dev`, then bump the package version in both `installer/Cargo.toml` and `installer/Cargo.lock` to an unused version. CI runs on `dev` pushes and PRs targeting `dev` or `main`. After checks pass, merge the `dev` → `main` release PR with a merge commit (never squash or rebase), create an annotated `v<version>` tag on that merged commit, and push the tag to publish the release. Merge the released `main` back into `dev` to preserve shared ancestry and version consistency.
+
 Use Conventional Commits: `feat:`, `fix:`, `docs:`, `chore:`.
