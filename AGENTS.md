@@ -75,6 +75,13 @@ devenv-linux/
 - Deactivate is available only when `mise ls --global --json <tool>` proves global ownership. Remove every requested global version with `mise unuse --global --no-prune <tool@version>`.
 - PATH-only and locally configured tools cannot be deactivated. System packages and configurations have no removal behavior.
 - Mise installation is lazy. It is an implicit prerequisite only for selected mise-tool installs and Bash/Fish configuration.
+- Headless installs record and print per-component outcomes, continue independent work after failures, and exit nonzero if any component fails.
+- Arch package installation uses existing databases with `pacman -S --needed`; users must complete a full system upgrade separately when databases/packages are stale. Never run a standalone `pacman -Sy`.
+- Root installations call package managers directly and do not require sudo.
+- Distro detection parses quoted ID values and whitespace-separated ID_LIKE tokens, including rhel.
+- Mise bootstrap downloads successfully to a temporary file before execution and verifies the resulting executable.
+- Shell activation resolves mise on PATH with a ~/.local/bin fallback. Fish uses interactive activation and noninteractive --shims; Bash hooks run only interactively.
+- Explicit shell configuration installs migrate exact legacy installer activation lines with numbered backups, ignore commented activation when detecting setup, and preserve custom activation blocks.
 - Config installs should be non-destructive and back up existing user files when overwriting.
 - Explicit Neovim configuration installs must prepare a staging directory before touching the live config, use numbered `nvim.bak` backups, and restore the original if the final swap fails.
 - `devenv.example.toml` should include every built-in component from `registry.rs`.

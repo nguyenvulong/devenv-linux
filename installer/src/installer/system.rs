@@ -10,20 +10,27 @@ where
     }
 
     let distro = get_distro();
-    let (mut install_cmd, pre_cmd) = match distro {
+    let (mut install_cmd, mut pre_cmd) = match distro {
         DistroFamily::Debian => (
             vec!["sudo", "apt-get", "install", "-y"],
             Some(vec!["sudo", "apt-get", "update"]),
         ),
         DistroFamily::Arch => (
-            vec!["sudo", "pacman", "-S", "--noconfirm"],
-            Some(vec!["sudo", "pacman", "-Sy"]),
+            vec!["sudo", "pacman", "-S", "--needed", "--noconfirm"],
+            None,
         ),
         DistroFamily::RedHat => (vec!["sudo", "dnf", "install", "-y"], None),
         DistroFamily::Unknown => {
             return Err(anyhow::anyhow!("Unsupported distribution family: Unknown"));
         }
     };
+
+    if crate::sys::is_root() {
+        install_cmd.remove(0);
+        if let Some(cmd) = &mut pre_cmd {
+            cmd.remove(0);
+        }
+    }
 
     if let Some(cmd) = pre_cmd {
         log("Updating package lists...");

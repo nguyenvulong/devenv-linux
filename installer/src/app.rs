@@ -203,14 +203,18 @@ fn observe_component(component: &Component, home: &str) -> ObservedState {
         Category::Config => {
             let exists = match component.id.as_str() {
                 "config-nvim" => std::path::Path::new(home).join(".config/nvim").exists(),
-                "config-bash" => {
-                    std::fs::read_to_string(std::path::Path::new(home).join(".bashrc"))
-                        .is_ok_and(|contents| contents.contains("mise activate bash"))
-                }
+                "config-bash" => std::fs::read_to_string(
+                    std::path::Path::new(home).join(".bashrc"),
+                )
+                .is_ok_and(|contents| {
+                    crate::installer::config::has_shell_activation(&contents, "bash")
+                }),
                 "config-fish" => std::fs::read_to_string(
                     std::path::Path::new(home).join(".config/fish/config.fish"),
                 )
-                .is_ok_and(|contents| contents.contains("mise activate fish")),
+                .is_ok_and(|contents| {
+                    crate::installer::config::has_shell_activation(&contents, "fish")
+                }),
                 _ => false,
             };
             if exists {

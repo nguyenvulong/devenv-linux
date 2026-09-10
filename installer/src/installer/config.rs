@@ -24,108 +24,15 @@ where
 {
     match component.id.as_str() {
         "config-bash" => {
-            let bashrc = home.join(".bashrc");
-            let mise_line = "eval \"$($HOME/.local/bin/mise activate bash)\"\n";
-
-            let already_set = if bashrc.exists() {
-                fs::read_to_string(&bashrc)
-                    .map(|s| s.contains("mise activate bash"))
-                    .unwrap_or(false)
-            } else {
-                false
-            };
-
-            if already_set {
-                log("Bash .bashrc already contains mise activation -- skipping.");
-                return Ok(ConfigOutcome::AlreadyConfigured);
-            }
-
-            log(&format!(
-                "Appending mise activation to {}",
-                bashrc.display()
-            ));
-            use std::io::Write;
-            let mut file = fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(&bashrc)
-                .with_context(|| format!("Failed to open {}", bashrc.display()))?;
-            writeln!(
-                file,
-                "\n# mise activation -- added by devenv-linux installer"
-            )
-            .with_context(|| format!("Failed to update {}", bashrc.display()))?;
-            write!(file, "{mise_line}")
-                .with_context(|| format!("Failed to write {}", bashrc.display()))?;
-            Ok(ConfigOutcome::Changed)
+            update_shell_config(&home.join(".bashrc"), "bash", BASH_ACTIVATION, "", log)
         }
-        "config-fish" => {
-            let config_dir = home.join(".config/fish");
-            fs::create_dir_all(&config_dir)
-                .with_context(|| format!("Failed to create {}", config_dir.display()))?;
-            let dest = config_dir.join("config.fish");
-
-            let already_set = if dest.exists() {
-                fs::read_to_string(&dest)
-                    .map(|s| s.contains("mise activate fish"))
-                    .unwrap_or(false)
-            } else {
-                false
-            };
-
-            if already_set {
-                log("Fish config.fish already contains mise activation -- skipping.");
-                return Ok(ConfigOutcome::AlreadyConfigured);
-            }
-
-            let mise_line = "~/.local/bin/mise activate fish | source\n";
-
-            if !dest.exists() {
-                log("Writing generic fish config...");
-                let content = format!(
-                    "
-# colors
-export LS_COLORS=\"di=1;36:ln=35:so=32:pi=33:ex=31:bd=34;46:cd=34;43:su=30;41:sg=30;46:tw=30;42:ow=30;43\"
-
-# path
-set PATH $PATH ~/.local/bin ~/.local/share/mise/shims
-
-# aliases
-alias ls='eza --icons=always'
-alias la='ls -a'
-alias ll='eza -lah'
-alias l='eza -lah --classify --grid'
-
-alias vim='v'
-alias v='nvim'
-alias vd='nvim -d'
-alias cat='BAT_THEME=Dracula bat --paging=never --plain'
-
-function history
-    builtin history --show-time=\"%Y-%m-%d %H:%M:%S \" $argv
-end
-
-# mise activation
-{}",
-                    mise_line
-                );
-                fs::write(&dest, content)
-                    .with_context(|| format!("Failed to write {}", dest.display()))?;
-            } else {
-                log(&format!("Appending mise activation to {}", dest.display()));
-                use std::io::Write;
-                let mut f = fs::OpenOptions::new()
-                    .append(true)
-                    .open(&dest)
-                    .with_context(|| format!("Failed to open {}", dest.display()))?;
-                writeln!(f, "\n# mise activation -- added by devenv-linux installer")
-                    .with_context(|| format!("Failed to update {}", dest.display()))?;
-                write!(f, "{mise_line}")
-                    .with_context(|| format!("Failed to write {}", dest.display()))?;
-            }
-
-            Ok(ConfigOutcome::Changed)
-        }
+        "config-fish" => update_shell_config(
+            &home.join(".config/fish/config.fish"),
+            "fish",
+            FISH_ACTIVATION,
+            FISH_DEFAULTS,
+            log,
+        ),
         "config-nvim" => {
             let nvim_dir = home.join(".config/nvim");
             let staging_dir = next_staging_path(&nvim_dir)?;
@@ -200,6 +107,114 @@ vim.g.clipboard = {
             Ok(ConfigOutcome::Changed)
         }
     }
+}
+
+const FISH_DEFAULTS: &str = "
+# colors
+export LS_COLORS=\"di=1;36:ln=35:so=32:pi=33:ex=31:bd=34;46:cd=34;43:su=30;41:sg=30;46:tw=30;42:ow=30;43\"
+
+# path
+set PATH $PATH ~/.local/bin ~/.local/share/mise/shims
+
+# aliases
+alias ls='eza --icons=always'
+alias la='ls -a'
+alias ll='eza -lah'
+alias l='eza -lah --classify --grid'
+
+alias vim='v'
+alias v='nvim'
+alias vd='nvim -d'
+alias cat='BAT_THEME=Dracula bat --paging=never --plain'
+
+function history
+    builtin history --show-time=\"%Y-%m-%d %H:%M:%S \" $argv
+end
+
+";
+
+const BASH_ACTIVATION: &str = r#"# mise activation -- added by devenv-linux installer
+if ! command -v mise >/dev/null 2>&1; then
+    export PATH="$HOME/.local/bin:$PATH"
+fi
+case $- in
+    *i*) eval "$(mise activate bash)" ;;
+esac
+"#;
+
+const FISH_ACTIVATION: &str = r#"# mise activation -- added by devenv-linux installer
+if not type -q mise
+    set -gx PATH "$HOME/.local/bin" $PATH
+end
+if status is-interactive
+    mise activate fish | source
+else
+    mise activate fish --shims | source
+end
+"#;
+
+pub(crate) fn has_shell_activation(contents: &str, shell: &str) -> bool {
+    contents.lines().any(|line| {
+        let line = line.trim();
+        !line.starts_with('#') && line.contains(&format!("mise activate {shell}"))
+    })
+}
+
+fn update_shell_config<F>(
+    destination: &Path,
+    shell: &str,
+    activation: &str,
+    defaults: &str,
+    mut log: F,
+) -> Result<ConfigOutcome>
+where
+    F: FnMut(&str),
+{
+    let existing = match fs::read_to_string(destination) {
+        Ok(contents) => Some(contents),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+        Err(error) => {
+            return Err(error).with_context(|| format!("Failed to read {}", destination.display()));
+        }
+    };
+    let original = existing.as_deref().unwrap_or(defaults);
+    let legacy = match shell {
+        "fish" => "~/.local/bin/mise activate fish | source",
+        _ => "eval \"$($HOME/.local/bin/mise activate bash)\"",
+    };
+    let has_legacy = original.lines().any(|line| line == legacy);
+    if !has_legacy && has_shell_activation(original, shell) {
+        return Ok(ConfigOutcome::AlreadyConfigured);
+    }
+    let updated = if has_legacy {
+        original
+            .split_inclusive('\n')
+            .map(|line| {
+                if line.trim_end_matches('\n') == legacy {
+                    activation
+                } else {
+                    line
+                }
+            })
+            .collect::<String>()
+    } else {
+        format!("{original}\n{activation}")
+    };
+    if let Some(parent) = destination.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    if existing.is_some() {
+        let backup = next_backup_path(destination)?;
+        fs::copy(destination, &backup)
+            .with_context(|| format!("Failed to back up {}", destination.display()))?;
+        log(&format!(
+            "Existing configuration backed up to {}",
+            backup.display()
+        ));
+    }
+    fs::write(destination, updated)
+        .with_context(|| format!("Failed to write {}", destination.display()))?;
+    Ok(ConfigOutcome::Changed)
 }
 
 fn next_staging_path(destination: &Path) -> Result<PathBuf> {
@@ -284,6 +299,62 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     static NEXT_TEMP: AtomicUsize = AtomicUsize::new(0);
+
+    #[test]
+    fn legacy_activation_should_be_backed_up_migrated_and_idempotent() {
+        for (shell, legacy, activation) in [
+            (
+                "fish",
+                "~/.local/bin/mise activate fish | source",
+                FISH_ACTIVATION,
+            ),
+            (
+                "bash",
+                "eval \"$($HOME/.local/bin/mise activate bash)\"",
+                BASH_ACTIVATION,
+            ),
+        ] {
+            let root = TestDir::new();
+            let dest = root.path().join(shell);
+            let original = format!("# user settings\n{legacy}\n# keep me\n");
+            fs::write(&dest, &original).unwrap();
+            update_shell_config(&dest, shell, activation, "", |_| {}).unwrap();
+            assert_eq!(
+                fs::read_to_string(root.path().join(format!("{shell}.bak"))).unwrap(),
+                original
+            );
+            let updated = fs::read_to_string(&dest).unwrap();
+            assert!(updated.contains(activation) && updated.ends_with("# keep me\n"));
+            assert_eq!(
+                update_shell_config(&dest, shell, activation, "", |_| {}).unwrap(),
+                ConfigOutcome::AlreadyConfigured
+            );
+        }
+    }
+
+    #[test]
+    fn commented_activation_should_not_prevent_setup() {
+        let root = TestDir::new();
+        let dest = root.path().join("config.fish");
+        fs::write(&dest, "# mise activate fish | source\n").unwrap();
+        assert_eq!(
+            update_shell_config(&dest, "fish", FISH_ACTIVATION, "", |_| {}).unwrap(),
+            ConfigOutcome::Changed
+        );
+    }
+
+    #[test]
+    fn custom_activation_should_be_preserved() {
+        let root = TestDir::new();
+        let dest = root.path().join("config.fish");
+        let original = "if status is-interactive\n    /opt/mise activate fish | source\nend\n";
+        fs::write(&dest, original).unwrap();
+        assert_eq!(
+            update_shell_config(&dest, "fish", FISH_ACTIVATION, "", |_| {}).unwrap(),
+            ConfigOutcome::AlreadyConfigured
+        );
+        assert_eq!(fs::read_to_string(dest).unwrap(), original);
+    }
 
     struct TestDir(PathBuf);
 

@@ -154,7 +154,7 @@ fn run_headless_components(components: Vec<Component>, mode: &str) -> Result<(),
     println!();
 
     let install_plan = InstallPlan::from_components(&components);
-    if install_plan.needs_sudo() {
+    if install_plan.needs_sudo() && !sys::is_root() {
         println!("Some components require elevated privileges (sudo).");
         let status = Command::new("sudo").arg("-v").status()?;
         if !status.success() {
@@ -164,52 +164,74 @@ fn run_headless_components(components: Vec<Component>, mode: &str) -> Result<(),
         start_sudo_keepalive();
     }
 
+    let mut outcomes: std::collections::HashMap<String, ComponentOutcome> = components
+        .iter()
+        .map(|component| (component.id.clone(), ComponentOutcome::Kept))
+        .collect();
+
     println!(">>> Phase 1: System Packages");
-    let sys_comps: Vec<&registry::Component> = install_plan.system.iter().collect();
-    if let Err(e) =
-        installer::system::install_system_packages(&sys_comps, |msg| println!("{}", msg))
-    {
-        eprintln!("[ERROR] System packages: {}", e);
+    let sys_comps: Vec<&Component> = install_plan.system.iter().collect();
+    let system_result =
+        installer::system::install_system_packages(&sys_comps, |msg| println!("{msg}"));
+    for component in &install_plan.system {
+        let outcome = match &system_result {
+            Ok(()) => ComponentOutcome::Succeeded,
+            Err(error) => ComponentOutcome::Failed(error.to_string()),
+        };
+        outcomes.insert(component.id.clone(), outcome);
     }
 
     println!("\n>>> Phase 2: Mise Tools");
-    let mise_ready = if install_plan.needs_mise_install() {
-        match installer::mise::install_mise(|msg| println!("{}", msg)) {
-            Ok(()) => true,
-            Err(error) => {
-                eprintln!("[ERROR] mise prerequisite: {error}");
-                false
-            }
-        }
+    let mise_error = if install_plan.needs_mise_install() {
+        installer::mise::install_mise(|msg| println!("{msg}"))
+            .err()
+            .map(|error| format!("mise prerequisite: {error}"))
     } else {
-        true
+        None
     };
 
     for component in &install_plan.mise {
-        if !mise_ready {
-            eprintln!("[ERROR] mise tool {}: mise is unavailable", component.id);
-            continue;
-        }
-        if let Err(error) =
-            installer::mise::activate_mise_tools(&[component], |message| println!("{message}"))
-        {
-            eprintln!("[ERROR] mise tool {}: {error}", component.id);
-        }
+        let outcome = if let Some(error) = &mise_error {
+            ComponentOutcome::Failed(error.clone())
+        } else {
+            match installer::mise::activate_mise_tools(&[component], |msg| println!("{msg}")) {
+                Ok(()) => ComponentOutcome::Succeeded,
+                Err(error) => ComponentOutcome::Failed(error.to_string()),
+            }
+        };
+        outcomes.insert(component.id.clone(), outcome);
     }
 
     println!("\n>>> Phase 3: Configurations");
     for component in &install_plan.configs {
-        if config_needs_mise(component) && !mise_ready {
-            eprintln!("[ERROR] config {}: mise is unavailable", component.id);
-            continue;
-        }
-        if let Err(error) =
-            installer::config::setup_config(component, |message| println!("{message}"))
-        {
-            eprintln!("[ERROR] config {}: {error}", component.id);
-        }
+        let outcome =
+            if let Some(error) = mise_error.as_ref().filter(|_| config_needs_mise(component)) {
+                ComponentOutcome::Failed(error.clone())
+            } else {
+                match installer::config::setup_config(component, |msg| println!("{msg}")) {
+                    Ok(installer::config::ConfigOutcome::Changed) => ComponentOutcome::Succeeded,
+                    Ok(installer::config::ConfigOutcome::AlreadyConfigured) => {
+                        ComponentOutcome::AlreadyConfigured
+                    }
+                    Err(error) => ComponentOutcome::Failed(error.to_string()),
+                }
+            };
+        outcomes.insert(component.id.clone(), outcome);
     }
 
+    println!("\nInstallation report:");
+    for component in &components {
+        if let Some(outcome) = outcomes.get(&component.id) {
+            println!("{}: {outcome:?}", component.id);
+        }
+    }
+    let failures = outcomes
+        .values()
+        .filter(|outcome| matches!(outcome, ComponentOutcome::Failed(_)))
+        .count();
+    if failures > 0 {
+        return Err(format!("{failures} component(s) failed to install").into());
+    }
     println!("\n✅ All done!");
     Ok(())
 }
@@ -321,6 +343,9 @@ fn config_needs_mise(component: &Component) -> bool {
 }
 
 fn ensure_sudo_credentials_for_install() -> Result<bool, Box<dyn Error>> {
+    if sys::is_root() {
+        return Ok(true);
+    }
     if has_cached_sudo_credentials()? {
         start_sudo_keepalive();
         return Ok(true);

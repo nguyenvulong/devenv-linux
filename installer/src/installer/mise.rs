@@ -4,6 +4,14 @@ use anyhow::{Context, Result, anyhow};
 use serde_json::Value;
 use std::{fs, process::Command};
 
+const MISE_BOOTSTRAP: &str = r#"set -eu
+devenv_script=$(mktemp)
+trap 'rm -f "$devenv_script"' EXIT
+curl -fsSL https://mise.run -o "$devenv_script"
+test -s "$devenv_script"
+sh "$devenv_script"
+"#;
+
 pub fn install_mise<F>(mut log: F) -> Result<()>
 where
     F: FnMut(&str) + Send + 'static,
@@ -16,8 +24,17 @@ where
     }
 
     log("Installing mise...");
-    let result = run_cmd_streaming("sh", &["-c", "curl https://mise.run | sh"], log)?;
+    let result = run_cmd_streaming("sh", &["-c", MISE_BOOTSTRAP], log)?;
     if result.success {
+        let output = Command::new(mise_bin())
+            .arg("--version")
+            .output()
+            .context("mise bootstrap completed but mise could not be executed")?;
+        if !output.status.success() {
+            return Err(anyhow!(
+                "mise bootstrap completed but mise verification failed"
+            ));
+        }
         Ok(())
     } else {
         Err(anyhow!("Failed to install mise: {}", result.stderr.trim()))

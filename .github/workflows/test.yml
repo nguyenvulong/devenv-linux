@@ -65,6 +65,10 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Run regression tests
+        run: cargo test --locked
+        working-directory: installer
+
       - name: Build devenv
         run: cargo build --release
         working-directory: installer
