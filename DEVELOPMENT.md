@@ -27,13 +27,20 @@ We follow a modified Trunk-Based / Git Flow approach to keep development fast wh
 
 When the `dev` branch is stable and a new version is ready to be published:
 
-1.  **Integration PR:** Create a PR from `dev` to `main`. Title it appropriately, e.g., `chore: release v1.2.0`.
+1.  **Prepare:** Fetch the remote branches and tags, merge `origin/main` into `dev`, and review any conflicts. Update the package version in both `installer/Cargo.toml` and `installer/Cargo.lock` to an unused release version, then commit and push `dev`.
+2.  **Integration PR:** Create a PR from `dev` to `main`. Title it appropriately, e.g., `chore: release v1.2.0`. Wait for all CI checks to pass; PR checks run for both `dev` and `main` targets.
     *   **Important:** Use a standard **Merge Commit** for this PR (do not Squash or Rebase). This preserves the individual feature history from `dev` into `main` and allows Git to properly track the shared lineage between the two branches.
-2.  **Tagging:** Once the PR is merged into `main`, pull `main` locally and create an annotated Git tag:
+3.  **Tagging:** Once the PR is merged into `main`, pull `main` locally and create an annotated Git tag on the release merge commit. The version must match `installer/Cargo.toml`:
     ```bash
     git checkout main
-    git pull
-    git tag v1.2.0
+    git pull --ff-only origin main
+    git tag -a v1.2.0 -m "Release v1.2.0"
     git push origin v1.2.0
     ```
-3.  **Automation:** The push of the `v*` tag automatically triggers `.github/workflows/release.yml`. This workflow will cross-compile the musl binaries and publish a new GitHub Release.
+4.  **Automation:** The push of the `v*` tag automatically triggers `.github/workflows/release.yml`. This workflow will cross-compile the musl binaries and publish a new GitHub Release.
+5.  **Synchronize:** Merge the released `main` back into `dev` so both branches share the release history and version:
+    ```bash
+    git checkout dev
+    git merge origin/main
+    git push origin dev
+    ```

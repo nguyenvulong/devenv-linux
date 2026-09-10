@@ -4,7 +4,7 @@ on:
   push:
     branches: [dev]
   pull_request:
-    branches: [dev]
+    branches: [dev, main]
   workflow_dispatch:
 
 jobs:
@@ -64,6 +64,10 @@ jobs:
       # `su - testuser -c` which spawns a login shell with a different $PATH.
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Run regression tests
+        run: cargo test --locked
+        working-directory: installer
 
       - name: Build devenv
         run: cargo build --release

@@ -92,6 +92,13 @@ pub fn check_command_exists(cmd: &str) -> bool {
     dirs.iter().any(|dir| dir.join(cmd).is_file())
 }
 
+pub fn is_root() -> bool {
+    Command::new("id")
+        .arg("-u")
+        .output()
+        .is_ok_and(|output| output.status.success() && output.stdout == b"0\n")
+}
+
 pub fn get_distro() -> DistroFamily {
     let os_release = std::fs::read_to_string("/etc/os-release").unwrap_or_default();
     parse_distro(&os_release)
@@ -113,22 +120,27 @@ pub fn get_command_version(cmd: &str, args: &[&str]) -> Option<String> {
 }
 
 fn parse_distro(os_release: &str) -> DistroFamily {
-    if os_release.contains("ID=debian")
-        || os_release.contains("ID=ubuntu")
-        || os_release.contains("ID_LIKE=debian")
-    {
-        DistroFamily::Debian
-    } else if os_release.contains("ID=arch") || os_release.contains("ID_LIKE=arch") {
-        DistroFamily::Arch
-    } else if os_release.contains("ID=fedora")
-        || os_release.contains("ID=centos")
-        || os_release.contains("ID_LIKE=fedora")
-        || os_release.contains("ID_LIKE=centos")
-    {
-        DistroFamily::RedHat
-    } else {
-        DistroFamily::Unknown
+    let mut id = "";
+    let mut like = "";
+    for line in os_release.lines() {
+        if let Some((key, value)) = line.trim().split_once('=') {
+            let value = value.trim().trim_matches(['"', '\'']);
+            match key {
+                "ID" => id = value,
+                "ID_LIKE" => like = value,
+                _ => {}
+            }
+        }
     }
+    std::iter::once(id)
+        .chain(like.split_whitespace())
+        .find_map(|id| match id {
+            "debian" | "ubuntu" => Some(DistroFamily::Debian),
+            "arch" => Some(DistroFamily::Arch),
+            "fedora" | "rhel" | "centos" => Some(DistroFamily::RedHat),
+            _ => None,
+        })
+        .unwrap_or(DistroFamily::Unknown)
 }
 
 fn parse_command_version_output(stdout: &str, stderr: &str) -> Option<String> {
@@ -157,6 +169,23 @@ fn parse_command_version_output(stdout: &str, stderr: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::{DistroFamily, parse_command_version_output, parse_distro};
+
+    #[test]
+    fn distro_fields_should_handle_quotes_tokens_and_id_precedence() {
+        for (input, expected) in [
+            ("ID=\"fedora\"\n", DistroFamily::RedHat),
+            ("ID=rhel\nID_LIKE=\"fedora\"\n", DistroFamily::RedHat),
+            (
+                "ID=rocky\nID_LIKE=\"rhel centos fedora\"\n",
+                DistroFamily::RedHat,
+            ),
+            ("ID=custom\nID_LIKE='ubuntu debian'\n", DistroFamily::Debian),
+            ("ID=arch\nID_LIKE=debian\n", DistroFamily::Arch),
+            ("ID=archipelago\n# ID=ubuntu\n", DistroFamily::Unknown),
+        ] {
+            assert_eq!(parse_distro(input), expected, "{input}");
+        }
+    }
 
     #[test]
     fn parse_distro_should_detect_debian_like_distributions() {
