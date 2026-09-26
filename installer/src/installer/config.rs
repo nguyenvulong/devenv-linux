@@ -54,6 +54,16 @@ where
                     log.clone(),
                 )?;
                 ensure_success(result, "clone LazyVim starter")?;
+                if let Ok(output) = std::process::Command::new("git")
+                    .args(["-C", staging, "rev-parse", "HEAD"])
+                    .output()
+                    && output.status.success()
+                {
+                    log(&format!(
+                        "Using LazyVim starter commit {}",
+                        String::from_utf8_lossy(&output.stdout).trim()
+                    ));
+                }
 
                 fs::remove_dir_all(staging_dir.join(".git"))
                     .context("Failed to remove LazyVim git metadata")?;
@@ -109,29 +119,31 @@ vim.g.clipboard = {
     }
 }
 
-const FISH_DEFAULTS: &str = "
-# colors
-export LS_COLORS=\"di=1;36:ln=35:so=32:pi=33:ex=31:bd=34;46:cd=34;43:su=30;41:sg=30;46:tw=30;42:ow=30;43\"
-
+const FISH_DEFAULTS: &str = r#"
 # path
-set PATH $PATH ~/.local/bin ~/.local/share/mise/shims
+fish_add_path --append ~/.local/bin ~/.local/share/mise/shims
 
-# aliases
-alias ls='eza --icons=always'
-alias la='ls -a'
-alias ll='eza -lah'
-alias l='eza -lah --classify --grid'
+if status is-interactive
+    # colors
+    set -gx LS_COLORS "di=1;36:ln=35:so=32:pi=33:ex=31:bd=34;46:cd=34;43:su=30;41:sg=30;46:tw=30;42:ow=30;43"
 
-alias vim='v'
-alias v='nvim'
-alias vd='nvim -d'
-alias cat='BAT_THEME=Dracula bat --paging=never --plain'
+    # aliases
+    alias ls='eza --icons=always'
+    alias la='ls -a'
+    alias ll='eza -lah'
+    alias l='eza -lah --classify --grid'
 
-function history
-    builtin history --show-time=\"%Y-%m-%d %H:%M:%S \" $argv
+    alias vim='v'
+    alias v='nvim'
+    alias vd='nvim -d'
+    alias cat='BAT_THEME=Dracula bat --paging=never --plain'
+
+    function history
+        builtin history --show-time="%Y-%m-%d %H:%M:%S " $argv
+    end
 end
 
-";
+"#;
 
 const BASH_ACTIVATION: &str = r#"# mise activation -- added by devenv-linux installer
 if ! command -v mise >/dev/null 2>&1; then
@@ -212,9 +224,43 @@ where
             backup.display()
         ));
     }
-    fs::write(destination, updated)
-        .with_context(|| format!("Failed to write {}", destination.display()))?;
+    write_atomically(destination, &updated)?;
     Ok(ConfigOutcome::Changed)
+}
+
+/// Replace a file's contents via a temporary sibling and rename, so a crash
+/// or full disk never leaves a truncated shell config. Symlinks (e.g. from a
+/// dotfile manager) are resolved so the link itself is preserved, and the
+/// original file permissions are kept.
+fn write_atomically(destination: &Path, contents: &str) -> Result<()> {
+    let target = if destination.is_symlink() {
+        fs::canonicalize(destination)
+            .with_context(|| format!("Failed to resolve symlink {}", destination.display()))?
+    } else {
+        destination.to_path_buf()
+    };
+    let temporary = next_numbered_path(&target, ".devenv-tmp")?;
+
+    let result = (|| -> Result<()> {
+        use std::io::Write;
+        let mut file = fs::File::create(&temporary)
+            .with_context(|| format!("Failed to create {}", temporary.display()))?;
+        file.write_all(contents.as_bytes())
+            .and_then(|()| file.sync_all())
+            .with_context(|| format!("Failed to write {}", temporary.display()))?;
+        if let Ok(metadata) = fs::metadata(&target) {
+            fs::set_permissions(&temporary, metadata.permissions()).with_context(|| {
+                format!("Failed to copy permissions to {}", temporary.display())
+            })?;
+        }
+        fs::rename(&temporary, &target)
+            .with_context(|| format!("Failed to replace {}", target.display()))
+    })();
+
+    if result.is_err() {
+        let _ = fs::remove_file(&temporary);
+    }
+    result
 }
 
 fn next_staging_path(destination: &Path) -> Result<PathBuf> {
@@ -354,6 +400,37 @@ mod tests {
             ConfigOutcome::AlreadyConfigured
         );
         assert_eq!(fs::read_to_string(dest).unwrap(), original);
+    }
+
+    #[test]
+    fn atomic_write_should_preserve_symlinks_and_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = TestDir::new();
+        let target = root.path().join("dotfiles-bashrc");
+        let link = root.path().join(".bashrc");
+        fs::write(&target, "# managed elsewhere\n").unwrap();
+        fs::set_permissions(&target, fs::Permissions::from_mode(0o600)).unwrap();
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+
+        update_shell_config(&link, "bash", BASH_ACTIVATION, "", |_| {}).unwrap();
+
+        assert!(link.is_symlink());
+        assert!(
+            fs::read_to_string(&target)
+                .unwrap()
+                .contains(BASH_ACTIVATION)
+        );
+        assert_eq!(
+            fs::metadata(&target).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        assert!(fs::read_dir(root.path()).unwrap().all(|entry| {
+            !entry
+                .unwrap()
+                .file_name()
+                .to_string_lossy()
+                .contains("devenv-tmp")
+        }));
     }
 
     struct TestDir(PathBuf);

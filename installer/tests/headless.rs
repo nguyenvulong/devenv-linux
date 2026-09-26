@@ -109,6 +109,8 @@ fn fish_activation_selects_interactive_hooks_or_shims() {
             .status
             .success()
     );
+    // Only record calls made by the shell config, not by the installer.
+    let _ = fs::remove_file(fixture.0.join("activation.log"));
     for (interactive, expected) in [
         (false, "activate fish --shims\n"),
         (true, "activate fish\n"),
