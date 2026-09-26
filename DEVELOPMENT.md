@@ -20,8 +20,15 @@ We follow a modified Trunk-Based / Git Flow approach to keep development fast wh
     ```
 2.  **Commit:** Make your changes locally. Commit messages must strictly adhere to the **Conventional Commits** specification (e.g., `feat: add collapsible groups to tui`, `fix: resolve sudo timeout bug`). This allows for automated changelog generation.
 3.  **Pull Request (PR):** Push your branch and open a PR targeting the `dev` branch.
-4.  **CI/CD Checks:** Opening a PR triggers the automated test matrix (`.github/workflows/test.yml`). Ensure all tests, formatting (`cargo fmt`), and linting (`cargo clippy`) pass.
-5.  **Merge:** Once reviewed and CI passes, the PR is merged into `dev` using **Squash and Merge** to maintain a clean history.
+4.  **CI/CD Checks:** Opening a PR triggers `.github/workflows/test.yml`. A fast `lint` job runs `cargo fmt --check`, `cargo clippy --all-targets --all-features --locked -- -D warnings`, `cargo test --locked`, `shellcheck`, and an end-to-end `install.sh` checksum test; the per-distro install matrix runs only after it passes. Run the same commands locally before pushing:
+    ```bash
+    cd installer
+    cargo fmt --check
+    cargo clippy --all-targets --all-features --locked -- -D warnings
+    cargo test --locked
+    shellcheck ../install.sh ../.github/scripts/*.sh
+    ```
+5.  **Merge:** Once reviewed and CI passes, feature PRs are merged into `dev` using **Squash and Merge**, one commit per logical change, with a Conventional Commit title. Only the `dev` → `main` release PR uses a merge commit (see below).
 
 ## Release Process
 
@@ -37,7 +44,7 @@ When the `dev` branch is stable and a new version is ready to be published:
     git tag -a v1.2.0 -m "Release v1.2.0"
     git push origin v1.2.0
     ```
-4.  **Automation:** The push of the `v*` tag automatically triggers `.github/workflows/release.yml`. This workflow will cross-compile the musl binaries and publish a new GitHub Release.
+4.  **Automation:** The push of the `v*` tag automatically triggers `.github/workflows/release.yml`. This workflow will cross-compile the musl binaries, publish `SHA256SUMS` and build provenance attestations, and create a new GitHub Release. `install.sh` refuses to run archives without a matching checksum.
 5.  **Synchronize:** Merge the released `main` back into `dev` so both branches share the release history and version:
     ```bash
     git checkout dev

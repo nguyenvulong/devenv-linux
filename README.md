@@ -12,12 +12,27 @@ Run the bootstrap script:
 curl -fsSL https://raw.githubusercontent.com/nguyenvulong/devenv-linux/main/install.sh | bash
 ```
 
-Or download and run the latest release binary directly:
+The script downloads the release archive for your architecture, verifies it
+against the release's `SHA256SUMS`, and refuses to run a binary that does not
+match. It needs `curl` or `wget`, plus `tar` and `xz`. Set `DEVENV_VERSION` to
+install a specific release:
 
 ```bash
-curl -fsSL https://github.com/nguyenvulong/devenv-linux/releases/latest/download/$(uname -m).tar.xz | tar xJ
+curl -fsSL https://raw.githubusercontent.com/nguyenvulong/devenv-linux/main/install.sh | DEVENV_VERSION=v1.1.0 bash
+```
+
+Or download, verify, and run the latest release binary directly:
+
+```bash
+base=https://github.com/nguyenvulong/devenv-linux/releases/latest/download
+curl -fsSLO "$base/$(uname -m).tar.xz" -fsSLO "$base/SHA256SUMS"
+sha256sum -c --ignore-missing SHA256SUMS
+tar xJf "$(uname -m).tar.xz"
 ./devenv
 ```
+
+Release archives also carry GitHub build provenance, which you can check with
+`gh attestation verify "$(uname -m).tar.xz" --repo nguyenvulong/devenv-linux`.
 
 Common CLI helpers:
 
@@ -27,6 +42,10 @@ Common CLI helpers:
 ./devenv --version
 ./devenv -v
 ```
+
+Unknown or conflicting arguments are rejected with exit code 2. Without
+`--all` or `--config`, devenv needs an interactive terminal and exits with an
+error otherwise.
 
 After installation, reload your shell:
 
@@ -60,14 +79,27 @@ components, implicit prerequisites, and replacement warnings. Enter again
 confirms execution; Esc returns to selection. Sudo is requested only after
 confirmation and only when a planned system-package installation needs it.
 
+The review also lists commands the plan relies on but does not install:
+`curl` for bootstrapping mise and `git` for cloning LazyVim. Select **Base
+Dependencies** or install them first; otherwise those components fail early
+with a clear message. After installation the log stays on screen until Enter
+opens the summary.
+
 Mise is installed lazily when an Install action needs a mise tool or Bash/Fish
 activation. Deactivation uses the versions found in the global mise config and
-leaves installed caches in place.
+leaves installed caches in place. The installer logs the mise version it
+installed or found; set `MISE_VERSION` to pin the mise bootstrap version.
 
 Explicitly reinstalling the LazyVim configuration is staged before the live
 configuration is touched. Once staging succeeds, the existing directory is
 renamed to `~/.config/nvim.bak`, then `.bak.1`, `.bak.2`, and so on. If the
-final swap fails, the original configuration is restored.
+final swap fails, the original configuration is restored. The installed
+LazyVim starter commit is logged.
+
+Bash and Fish configuration updates are written atomically (temporary file,
+then rename) after a numbered backup, keep file permissions, and follow
+symlinks from dotfile managers. The default Fish config adds mise paths with
+`fish_add_path` and only defines aliases in interactive shells.
 
 ## Non-Interactive Install Modes
 
@@ -79,8 +111,10 @@ development environments:
 ```bash
 ./devenv --all
 # or
-CI=true ./devenv
+INSTALLER_ALL=1 ./devenv
 ```
+
+`CI=true` alone no longer triggers a full install; pass `--all` explicitly.
 
 ### Install From Config
 
