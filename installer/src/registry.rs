@@ -193,11 +193,30 @@ impl InstallPlan {
     }
 
     pub fn needs_mise_install(&self) -> bool {
-        !self.mise.is_empty()
-            || self
-                .configs
-                .iter()
-                .any(|component| matches!(component.id.as_str(), "config-bash" | "config-fish"))
+        !self.mise.is_empty() || self.configs.iter().any(config_needs_mise)
+    }
+
+    pub fn installs_base_deps(&self) -> bool {
+        self.system
+            .iter()
+            .any(|component| component.id == "base-deps")
+    }
+
+    /// Commands the plan relies on that are not installed by the plan itself,
+    /// paired with the reason each is needed.
+    pub fn required_commands(&self) -> Vec<(&'static str, &'static str)> {
+        let mut commands = Vec::new();
+        if self.needs_mise_install() {
+            commands.push(("curl", "bootstrapping mise"));
+        }
+        if self
+            .configs
+            .iter()
+            .any(|component| component.id == "config-nvim")
+        {
+            commands.push(("git", "cloning the LazyVim starter"));
+        }
+        commands
     }
 
     pub fn replaces_existing_nvim_config(&self) -> bool {
@@ -206,6 +225,10 @@ impl InstallPlan {
                 && matches!(component.observed, ObservedState::ExistingConfig)
         })
     }
+}
+
+pub fn config_needs_mise(component: &Component) -> bool {
+    matches!(component.id.as_str(), "config-bash" | "config-fish")
 }
 
 fn collect_components(
@@ -478,6 +501,22 @@ mod tests {
         component.action = ComponentAction::Install;
 
         assert!(!InstallPlan::from_components(&[component]).needs_mise_install());
+    }
+
+    #[test]
+    fn plan_should_list_commands_needed_by_prerequisites() {
+        let mut bash = config_component("config-bash");
+        bash.action = ComponentAction::Install;
+        let mut nvim = config_component("config-nvim");
+        nvim.action = ComponentAction::Install;
+
+        assert_eq!(
+            InstallPlan::from_components(&[bash, nvim]).required_commands(),
+            vec![
+                ("curl", "bootstrapping mise"),
+                ("git", "cloning the LazyVim starter"),
+            ]
+        );
     }
 
     #[test]
