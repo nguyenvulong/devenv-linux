@@ -12,11 +12,15 @@ struct Manifest {
     tool: Vec<ManifestTool>,
 }
 
+const EMBEDDED_MANIFEST: &str = include_str!("../mise_registry.toml");
+
 /// Load the curated tool list embedded at compile time.
 pub fn load_manifest() -> Vec<ManifestTool> {
-    let raw = include_str!("../mise_registry.toml");
-    let m: Manifest = toml::from_str(raw).expect("mise_registry.toml is invalid TOML");
-    m.tool
+    parse_manifest(EMBEDDED_MANIFEST).unwrap_or_default()
+}
+
+fn parse_manifest(raw: &str) -> Result<Vec<ManifestTool>, toml::de::Error> {
+    toml::from_str::<Manifest>(raw).map(|manifest| manifest.tool)
 }
 
 /// Case-insensitive substring search across name and description.
@@ -79,7 +83,12 @@ pub fn merge(curated: Vec<ManifestTool>, runtime: Vec<ManifestTool>) -> Vec<Mani
 
 #[cfg(test)]
 mod tests {
-    use super::{ManifestTool, merge, search};
+    use super::{EMBEDDED_MANIFEST, ManifestTool, merge, parse_manifest, search};
+
+    #[test]
+    fn embedded_manifest_should_parse() {
+        assert!(!parse_manifest(EMBEDDED_MANIFEST).unwrap().is_empty());
+    }
 
     fn tool(name: &str, mise_id: &str, description: &str) -> ManifestTool {
         ManifestTool {

@@ -1,21 +1,23 @@
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::{Terminal, backend::CrosstermBackend, prelude::Backend};
 use std::{
+    collections::HashMap,
     error::Error,
-    io,
-    io::Write,
+    io::{self, IsTerminal, Write},
+    panic::{self, AssertUnwindSafe},
     path::PathBuf,
-    process::Command,
+    process::{Command, ExitCode},
     sync::{Arc, Mutex, atomic::Ordering},
     thread,
     time::Duration,
 };
 
 mod app;
+mod executor;
 mod headless_config;
 mod installer;
 mod manifest;
@@ -27,66 +29,93 @@ mod ui;
 use app::{App, Screen};
 use registry::{Component, ComponentAction, ComponentOutcome, InstallPlan};
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().collect();
-    if let Some(helper) = cli_helper(&args) {
-        match helper {
-            CliHelper::Help => print_help(),
-            CliHelper::Version => print_version(),
+    let installer_all = std::env::var("INSTALLER_ALL").is_ok_and(|value| value == "1");
+    let mode = match parse_args(&args, installer_all) {
+        Ok(mode) => mode,
+        Err(error) => {
+            eprintln!("error: {error}");
+            eprintln!("Run 'devenv --help' for usage.");
+            return ExitCode::from(2);
         }
-        return Ok(());
+    };
+
+    let result = match mode {
+        Mode::Help => {
+            print_help();
+            Ok(())
+        }
+        Mode::Version => {
+            print_version();
+            Ok(())
+        }
+        Mode::All => run_headless(),
+        Mode::Config(path) => run_headless_config(path),
+        Mode::Interactive => run_interactive(),
+    };
+
+    match result {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("error: {error}");
+            ExitCode::FAILURE
+        }
     }
-
-    if let Some(config_path) = headless_config_path(&args)? {
-        return run_headless_config(config_path);
-    }
-
-    let headless = args.iter().any(|a| a == "--all")
-        || std::env::var("CI").map(|v| v == "true").unwrap_or(false)
-        || std::env::var("INSTALLER_ALL")
-            .map(|v| v == "1")
-            .unwrap_or(false);
-
-    if headless {
-        return run_headless();
-    }
-
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-
-    let mut app = App::new();
-    let res = run_app(&mut terminal, &mut app);
-
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
-
-    if let Err(err) = res {
-        println!("{:?}", err);
-    }
-
-    Ok(())
 }
 
 #[derive(Debug, PartialEq, Eq)]
-enum CliHelper {
+enum Mode {
     Help,
     Version,
+    All,
+    Config(PathBuf),
+    Interactive,
 }
 
-fn cli_helper(args: &[String]) -> Option<CliHelper> {
-    args.iter().skip(1).find_map(|arg| match arg.as_str() {
-        "--help" | "-h" => Some(CliHelper::Help),
-        "--version" | "-v" => Some(CliHelper::Version),
-        _ => None,
-    })
+/// Parse command-line arguments strictly. Help and version win over any other
+/// argument; unknown arguments and conflicting modes are rejected.
+fn parse_args(args: &[String], installer_all: bool) -> Result<Mode, String> {
+    let args = args.get(1..).unwrap_or_default();
+    if args.iter().any(|arg| arg == "--help" || arg == "-h") {
+        return Ok(Mode::Help);
+    }
+    if args.iter().any(|arg| arg == "--version" || arg == "-v") {
+        return Ok(Mode::Version);
+    }
+
+    let mut all = false;
+    let mut config: Option<PathBuf> = None;
+    let mut iter = args.iter();
+    while let Some(arg) = iter.next() {
+        let path = if arg == "--all" {
+            all = true;
+            continue;
+        } else if arg == "--config" || arg == "-c" {
+            iter.next()
+                .map(String::as_str)
+                .ok_or_else(|| format!("{arg} requires a path"))?
+        } else if let Some(path) = arg.strip_prefix("--config=") {
+            path
+        } else {
+            return Err(format!("unknown argument: {arg}"));
+        };
+
+        if path.is_empty() {
+            return Err("--config requires a path".to_string());
+        }
+        if config.replace(PathBuf::from(path)).is_some() {
+            return Err("--config may only be given once".to_string());
+        }
+    }
+
+    match (all, config) {
+        (true, Some(_)) => Err("--all and --config cannot be combined".to_string()),
+        (_, Some(path)) => Ok(Mode::Config(path)),
+        (true, None) => Ok(Mode::All),
+        (false, None) if installer_all => Ok(Mode::All),
+        (false, None) => Ok(Mode::Interactive),
+    }
 }
 
 fn print_help() {
@@ -102,6 +131,11 @@ Options:
   -c, --config <PATH>    Install enabled components from a TOML config
   -h, --help             Print help
   -v, --version          Print version
+
+Environment:
+  INSTALLER_ALL=1        Same as --all
+
+Without --all or --config, an interactive terminal is required.
 ",
         env!("CARGO_PKG_VERSION")
     );
@@ -111,25 +145,52 @@ fn print_version() {
     println!("devenv {}", env!("CARGO_PKG_VERSION"));
 }
 
-fn headless_config_path(args: &[String]) -> Result<Option<PathBuf>, Box<dyn Error>> {
-    let mut iter = args.iter().skip(1);
-    while let Some(arg) = iter.next() {
-        if arg == "--config" || arg == "-c" {
-            let Some(path) = iter.next() else {
-                return Err(format!("{arg} requires a path").into());
-            };
-            return Ok(Some(PathBuf::from(path)));
-        }
-
-        if let Some(path) = arg.strip_prefix("--config=") {
-            if path.is_empty() {
-                return Err("--config requires a path".into());
-            }
-            return Ok(Some(PathBuf::from(path)));
-        }
+fn run_interactive() -> Result<(), Box<dyn Error>> {
+    let ci = std::env::var("CI").is_ok_and(|value| value == "true");
+    if ci || !io::stdout().is_terminal() {
+        return Err("no interactive terminal detected; \
+             use --all or --config <PATH> for non-interactive installs"
+            .into());
     }
 
-    Ok(None)
+    install_panic_hook();
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+
+    let res = run_tui(&mut terminal);
+
+    restore_terminal()?;
+    terminal.show_cursor()?;
+    res
+}
+
+fn run_tui<B: Backend>(terminal: &mut Terminal<B>) -> Result<(), Box<dyn Error>>
+where
+    <B as Backend>::Error: 'static,
+{
+    terminal.draw(ui::draw_loading)?;
+    let mut app = App::new();
+    run_app(terminal, &mut app)
+}
+
+fn restore_terminal() -> io::Result<()> {
+    disable_raw_mode()?;
+    execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture)
+}
+
+/// Restore the terminal before printing a panic from the TUI thread so the
+/// message is readable and the shell is not left in raw mode.
+fn install_panic_hook() {
+    let default_hook = panic::take_hook();
+    panic::set_hook(Box::new(move |info| {
+        if thread::current().name() == Some("main") {
+            let _ = restore_terminal();
+        }
+        default_hook(info);
+    }));
 }
 
 fn run_headless() -> Result<(), Box<dyn Error>> {
@@ -156,73 +217,34 @@ fn run_headless_components(components: Vec<Component>, mode: &str) -> Result<(),
     let install_plan = InstallPlan::from_components(&components);
     if install_plan.needs_sudo() && !sys::is_root() {
         println!("Some components require elevated privileges (sudo).");
-        let status = Command::new("sudo").arg("-v").status()?;
+        let status = Command::new("sudo")
+            .arg("-v")
+            .status()
+            .map_err(|e| format!("Failed to run sudo: {e}"))?;
         if !status.success() {
-            eprintln!("sudo authentication failed. Aborting.");
-            std::process::exit(1);
+            return Err("sudo authentication failed".into());
         }
         start_sudo_keepalive();
     }
 
-    let mut outcomes: std::collections::HashMap<String, ComponentOutcome> = components
+    let mut outcomes: HashMap<String, ComponentOutcome> = components
         .iter()
         .map(|component| (component.id.clone(), ComponentOutcome::Kept))
         .collect();
 
-    println!(">>> Phase 1: System Packages");
-    let sys_comps: Vec<&Component> = install_plan.system.iter().collect();
-    let system_result =
-        installer::system::install_system_packages(&sys_comps, |msg| println!("{msg}"));
-    for component in &install_plan.system {
-        let outcome = match &system_result {
-            Ok(()) => ComponentOutcome::Succeeded,
-            Err(error) => ComponentOutcome::Failed(error.to_string()),
-        };
-        outcomes.insert(component.id.clone(), outcome);
-    }
-
-    println!("\n>>> Phase 2: Mise Tools");
-    let mise_error = if install_plan.needs_mise_install() {
-        installer::mise::install_mise(|msg| println!("{msg}"))
-            .err()
-            .map(|error| format!("mise prerequisite: {error}"))
-    } else {
-        None
-    };
-
-    for component in &install_plan.mise {
-        let outcome = if let Some(error) = &mise_error {
-            ComponentOutcome::Failed(error.clone())
-        } else {
-            match installer::mise::activate_mise_tools(&[component], |msg| println!("{msg}")) {
-                Ok(()) => ComponentOutcome::Succeeded,
-                Err(error) => ComponentOutcome::Failed(error.to_string()),
-            }
-        };
-        outcomes.insert(component.id.clone(), outcome);
-    }
-
-    println!("\n>>> Phase 3: Configurations");
-    for component in &install_plan.configs {
-        let outcome =
-            if let Some(error) = mise_error.as_ref().filter(|_| config_needs_mise(component)) {
-                ComponentOutcome::Failed(error.clone())
-            } else {
-                match installer::config::setup_config(component, |msg| println!("{msg}")) {
-                    Ok(installer::config::ConfigOutcome::Changed) => ComponentOutcome::Succeeded,
-                    Ok(installer::config::ConfigOutcome::AlreadyConfigured) => {
-                        ComponentOutcome::AlreadyConfigured
-                    }
-                    Err(error) => ComponentOutcome::Failed(error.to_string()),
-                }
-            };
-        outcomes.insert(component.id.clone(), outcome);
-    }
+    executor::execute_plan(
+        &install_plan,
+        |msg: &str| println!("{msg}"),
+        |_| {},
+        |id, outcome| {
+            outcomes.insert(id.to_string(), outcome);
+        },
+    );
 
     println!("\nInstallation report:");
     for component in &components {
         if let Some(outcome) = outcomes.get(&component.id) {
-            println!("{}: {outcome:?}", component.id);
+            println!("{}: {}", component.id, outcome_label(outcome));
         }
     }
     let failures = outcomes
@@ -236,6 +258,17 @@ fn run_headless_components(components: Vec<Component>, mode: &str) -> Result<(),
     Ok(())
 }
 
+fn outcome_label(outcome: &ComponentOutcome) -> String {
+    match outcome {
+        ComponentOutcome::Pending => "Pending".to_string(),
+        ComponentOutcome::Succeeded => "Succeeded".to_string(),
+        ComponentOutcome::Failed(error) => format!("Failed ({error})"),
+        ComponentOutcome::AlreadyConfigured => "Already configured".to_string(),
+        ComponentOutcome::Deactivated => "Deactivated".to_string(),
+        ComponentOutcome::Kept => "Kept".to_string(),
+    }
+}
+
 fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<(), Box<dyn Error>>
 where
     <B as Backend>::Error: 'static,
@@ -247,80 +280,84 @@ where
             return Ok(());
         }
 
-        if app.screen == Screen::Installing {
-            let done = app.install_done.load(Ordering::Acquire);
-            if done {
-                app.screen = Screen::Report;
-            }
+        // Always wait on input with a timeout so the loop never spins, even
+        // while the installation thread is running.
+        if !event::poll(Duration::from_millis(100))? {
+            continue;
+        }
+        let Event::Key(key) = event::read()? else {
+            continue;
+        };
+        if key.kind != KeyEventKind::Press {
             continue;
         }
 
-        if event::poll(Duration::from_millis(100))?
-            && let Event::Key(key) = event::read()?
-        {
-            if app.screen == Screen::Selection && handle_selection_action_key(app, key.code) {
-                continue;
-            }
+        if app.screen == Screen::Selection && handle_selection_action_key(app, key.code) {
+            continue;
+        }
 
-            match app.screen {
-                Screen::Selection => match key.code {
-                    KeyCode::Char('q') | KeyCode::Esc => app.should_quit = true,
-                    KeyCode::Up | KeyCode::Char('k') => app.previous(),
-                    KeyCode::Down | KeyCode::Char('j') => app.next(),
-                    KeyCode::Char('/') => {
-                        app.search_query.clear();
-                        app.update_search();
-                        app.screen = Screen::Search;
+        match app.screen {
+            Screen::Selection => match key.code {
+                KeyCode::Char('q') | KeyCode::Esc => app.should_quit = true,
+                KeyCode::Up | KeyCode::Char('k') => app.previous(),
+                KeyCode::Down | KeyCode::Char('j') => app.next(),
+                KeyCode::Char('/') => {
+                    app.search_query.clear();
+                    app.update_search();
+                    app.screen = Screen::Search;
+                }
+                KeyCode::Enter => {
+                    let plan = InstallPlan::from_components(&app.components);
+                    if plan.is_empty() {
+                        app.notice = Some("No changes selected.".to_string());
+                    } else {
+                        app.notice = None;
+                        app.screen = Screen::Review;
                     }
-                    KeyCode::Enter => {
-                        let plan = InstallPlan::from_components(&app.components);
-                        if plan.is_empty() {
-                            app.notice = Some("No changes selected.".to_string());
-                        } else {
-                            app.notice = None;
-                            app.screen = Screen::Review;
-                        }
-                    }
-                    _ => {}
-                },
-                Screen::Review => match key.code {
-                    KeyCode::Esc => app.screen = Screen::Selection,
-                    KeyCode::Enter => {
-                        let plan = InstallPlan::from_components(&app.components);
-                        if plan.needs_sudo() && !ensure_sudo_credentials_for_install()? {
-                            continue;
-                        }
-
-                        app.prepare_installation();
-                        app.screen = Screen::Installing;
-                        spawn_installation(app);
-                    }
-                    _ => {}
-                },
-                Screen::Search => match key.code {
-                    KeyCode::Esc => app.screen = Screen::Selection,
-                    KeyCode::Up => app.search_previous(),
-                    KeyCode::Down => app.search_next(),
-                    KeyCode::Enter => {
-                        app.add_search_result();
-                        app.screen = Screen::Selection;
-                    }
-                    KeyCode::Backspace => {
-                        app.search_query.pop();
-                        app.update_search();
-                    }
-                    KeyCode::Char(c) => {
-                        app.search_query.push(c);
-                        app.update_search();
-                    }
-                    _ => {}
-                },
-                Screen::Report => match key.code {
-                    KeyCode::Char('q') | KeyCode::Esc | KeyCode::Enter => app.should_quit = true,
-                    _ => {}
-                },
+                }
                 _ => {}
+            },
+            Screen::Review => match key.code {
+                KeyCode::Esc => app.screen = Screen::Selection,
+                KeyCode::Enter => {
+                    let plan = InstallPlan::from_components(&app.components);
+                    if plan.needs_sudo() && !ensure_sudo_credentials_for_install()? {
+                        continue;
+                    }
+
+                    app.prepare_installation();
+                    app.screen = Screen::Installing;
+                    spawn_installation(app);
+                }
+                _ => {}
+            },
+            Screen::Installing => {
+                if key.code == KeyCode::Enter && app.install_done.load(Ordering::Acquire) {
+                    app.screen = Screen::Report;
+                }
             }
+            Screen::Search => match key.code {
+                KeyCode::Esc => app.screen = Screen::Selection,
+                KeyCode::Up => app.search_previous(),
+                KeyCode::Down => app.search_next(),
+                KeyCode::Enter => {
+                    app.add_search_result();
+                    app.screen = Screen::Selection;
+                }
+                KeyCode::Backspace => {
+                    app.search_query.pop();
+                    app.update_search();
+                }
+                KeyCode::Char(c) => {
+                    app.search_query.push(c);
+                    app.update_search();
+                }
+                _ => {}
+            },
+            Screen::Report => match key.code {
+                KeyCode::Char('q') | KeyCode::Esc | KeyCode::Enter => app.should_quit = true,
+                _ => {}
+            },
         }
     }
 }
@@ -336,10 +373,6 @@ fn handle_selection_action_key(app: &mut App, key: KeyCode) -> bool {
         _ => return false,
     }
     true
-}
-
-fn config_needs_mise(component: &Component) -> bool {
-    matches!(component.id.as_str(), "config-bash" | "config-fish")
 }
 
 fn ensure_sudo_credentials_for_install() -> Result<bool, Box<dyn Error>> {
@@ -391,22 +424,18 @@ fn start_sudo_keepalive() {
     thread::spawn(|| {
         loop {
             thread::sleep(Duration::from_secs(50));
-            let Ok(status) = Command::new("sudo").args(["-n", "true"]).status() else {
+            let Ok(status) = Command::new("sudo").args(["-n", "-v"]).status() else {
                 break;
             };
-
             if !status.success() {
                 break;
             }
-
-            let _ = Command::new("sudo").arg("-v").output();
         }
     });
 }
 
 fn suspend_tui() -> Result<(), Box<dyn Error>> {
-    disable_raw_mode()?;
-    execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture)?;
+    restore_terminal()?;
     Ok(())
 }
 
@@ -423,130 +452,27 @@ fn spawn_installation(app: &mut App) {
     let outcomes = Arc::clone(&app.outcomes);
     let install_plan = InstallPlan::from_components(&app.components);
 
-    let make_log = move |logs: Arc<Mutex<Vec<String>>>| {
-        move |msg: &str| {
-            if let Ok(mut guard) = logs.lock() {
-                guard.push(msg.to_string());
-            }
-        }
-    };
-
     thread::spawn(move || {
-        install_index.store(0, Ordering::Relaxed);
-        push_log(&logs, ">>> Phase 1: System Packages");
-
-        let sys_comps: Vec<&Component> = install_plan.system.iter().collect();
-        let system_result =
-            installer::system::install_system_packages(&sys_comps, make_log(logs.clone()));
-        match system_result {
-            Ok(()) => {
-                for component in &install_plan.system {
-                    set_outcome(&outcomes, &component.id, ComponentOutcome::Succeeded);
-                }
-            }
-            Err(error) => {
-                push_log(&logs, format!("[ERROR] System packages: {error}"));
-                for component in &install_plan.system {
-                    set_outcome(
-                        &outcomes,
-                        &component.id,
-                        ComponentOutcome::Failed(error.to_string()),
-                    );
-                }
-            }
-        }
-
-        install_index.store(1, Ordering::Relaxed);
-        push_log(&logs, "\n>>> Phase 2: Mise Tools");
-
-        for component in &install_plan.deactivate_mise {
-            match installer::mise::deactivate_mise_tools(&[component], make_log(logs.clone())) {
-                Ok(()) => set_outcome(&outcomes, &component.id, ComponentOutcome::Deactivated),
-                Err(error) => {
-                    push_log(
-                        &logs,
-                        format!("[ERROR] deactivate {}: {error}", component.id),
-                    );
-                    set_outcome(
-                        &outcomes,
-                        &component.id,
-                        ComponentOutcome::Failed(error.to_string()),
-                    );
-                }
-            }
-        }
-
-        let mise_ready = if install_plan.needs_mise_install() {
-            match installer::mise::install_mise(make_log(logs.clone())) {
-                Ok(()) => true,
-                Err(error) => {
-                    push_log(&logs, format!("[ERROR] mise prerequisite: {error}"));
-                    false
-                }
-            }
-        } else {
-            true
+        let log = {
+            let logs = Arc::clone(&logs);
+            move |msg: &str| push_log(&logs, msg)
         };
+        let result = panic::catch_unwind(AssertUnwindSafe(|| {
+            executor::execute_plan(
+                &install_plan,
+                log,
+                |phase| install_index.store(phase, Ordering::Relaxed),
+                |id, outcome| set_outcome(&outcomes, id, outcome),
+            );
+        }));
 
-        for component in &install_plan.mise {
-            if !mise_ready {
-                set_outcome(
-                    &outcomes,
-                    &component.id,
-                    ComponentOutcome::Failed("mise prerequisite failed".to_string()),
-                );
-                continue;
-            }
-            match installer::mise::activate_mise_tools(&[component], make_log(logs.clone())) {
-                Ok(()) => set_outcome(&outcomes, &component.id, ComponentOutcome::Succeeded),
-                Err(error) => {
-                    push_log(
-                        &logs,
-                        format!("[ERROR] mise tool {}: {error}", component.id),
-                    );
-                    set_outcome(
-                        &outcomes,
-                        &component.id,
-                        ComponentOutcome::Failed(error.to_string()),
-                    );
-                }
-            }
+        if result.is_err() {
+            push_log(&logs, "[ERROR] The installer thread panicked.");
         }
-
-        install_index.store(2, Ordering::Relaxed);
-        push_log(&logs, "\n>>> Phase 3: Configurations");
-
-        for component in &install_plan.configs {
-            if config_needs_mise(component) && !mise_ready {
-                set_outcome(
-                    &outcomes,
-                    &component.id,
-                    ComponentOutcome::Failed("mise prerequisite failed".to_string()),
-                );
-                continue;
-            }
-
-            match installer::config::setup_config(component, make_log(logs.clone())) {
-                Ok(installer::config::ConfigOutcome::Changed) => {
-                    set_outcome(&outcomes, &component.id, ComponentOutcome::Succeeded)
-                }
-                Ok(installer::config::ConfigOutcome::AlreadyConfigured) => set_outcome(
-                    &outcomes,
-                    &component.id,
-                    ComponentOutcome::AlreadyConfigured,
-                ),
-                Err(error) => {
-                    push_log(&logs, format!("[ERROR] config {}: {error}", component.id));
-                    set_outcome(
-                        &outcomes,
-                        &component.id,
-                        ComponentOutcome::Failed(error.to_string()),
-                    );
-                }
-            }
-        }
-
-        push_log(&logs, "\n✅ All done! Press Enter to view the summary.");
+        push_log(
+            &logs,
+            "\nInstallation finished. Press Enter to view the summary.",
+        );
         done_flag.store(true, Ordering::Release);
     });
 }
@@ -558,7 +484,7 @@ fn push_log(logs: &Arc<Mutex<Vec<String>>>, message: impl Into<String>) {
 }
 
 fn set_outcome(
-    outcomes: &Arc<Mutex<std::collections::HashMap<String, ComponentOutcome>>>,
+    outcomes: &Arc<Mutex<HashMap<String, ComponentOutcome>>>,
     component_id: &str,
     outcome: ComponentOutcome,
 ) {
@@ -569,9 +495,7 @@ fn set_outcome(
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        CliHelper, InstallPlan, cli_helper, handle_selection_action_key, headless_config_path,
-    };
+    use super::{InstallPlan, Mode, handle_selection_action_key, parse_args};
     use crate::app::{App, Screen};
     use crate::registry::{
         Category, Component, ComponentAction, ComponentOutcome, Group, ObservedState,
@@ -734,66 +658,71 @@ mod tests {
         assert_eq!(plan.mise[0].mise_version.as_deref(), Some("1.85.0"));
     }
 
-    #[test]
-    fn headless_config_path_should_parse_long_flag() {
-        let args = vec![
-            "devenv".to_string(),
-            "--config".to_string(),
-            "devenv.example.toml".to_string(),
-        ];
+    fn args(values: &[&str]) -> Vec<String> {
+        std::iter::once("devenv")
+            .chain(values.iter().copied())
+            .map(str::to_string)
+            .collect()
+    }
 
+    #[test]
+    fn parse_args_should_parse_config_forms() {
+        for values in [
+            &["--config", "devenv.example.toml"][..],
+            &["-c", "devenv.example.toml"],
+            &["--config=devenv.example.toml"],
+        ] {
+            assert_eq!(
+                parse_args(&args(values), false),
+                Ok(Mode::Config(PathBuf::from("devenv.example.toml")))
+            );
+        }
+    }
+
+    #[test]
+    fn parse_args_should_reject_missing_config_path() {
+        assert!(parse_args(&args(&["--config"]), false).is_err());
+        assert!(parse_args(&args(&["--config="]), false).is_err());
+    }
+
+    #[test]
+    fn parse_args_should_reject_unknown_and_conflicting_arguments() {
+        for values in [
+            &["--alll"][..],
+            &["install"],
+            &["--all", "--config", "a.toml"],
+            &["-c", "a.toml", "-c", "b.toml"],
+        ] {
+            assert!(parse_args(&args(values), false).is_err(), "{values:?}");
+        }
+    }
+
+    #[test]
+    fn parse_args_should_select_modes() {
+        assert_eq!(parse_args(&args(&[]), false), Ok(Mode::Interactive));
+        assert_eq!(parse_args(&args(&["--all"]), false), Ok(Mode::All));
+        assert_eq!(parse_args(&args(&[]), true), Ok(Mode::All));
         assert_eq!(
-            headless_config_path(&args).expect("args should parse"),
-            Some(PathBuf::from("devenv.example.toml"))
+            parse_args(&args(&["-c", "a.toml"]), true),
+            Ok(Mode::Config(PathBuf::from("a.toml")))
         );
     }
 
     #[test]
-    fn headless_config_path_should_parse_equals_form() {
-        let args = vec![
-            "devenv".to_string(),
-            "--config=devenv.example.toml".to_string(),
-        ];
-
-        assert_eq!(
-            headless_config_path(&args).expect("args should parse"),
-            Some(PathBuf::from("devenv.example.toml"))
-        );
-    }
-
-    #[test]
-    fn headless_config_path_should_reject_missing_path() {
-        let args = vec!["devenv".to_string(), "--config".to_string()];
-
-        assert!(headless_config_path(&args).is_err());
-    }
-
-    #[test]
-    fn cli_helper_should_parse_help_flags() {
+    fn parse_args_should_parse_help_and_version_flags() {
         for flag in ["--help", "-h"] {
-            let args = vec!["devenv".to_string(), flag.to_string()];
-
-            assert_eq!(cli_helper(&args), Some(CliHelper::Help));
+            assert_eq!(parse_args(&args(&[flag]), false), Ok(Mode::Help));
         }
-    }
-
-    #[test]
-    fn cli_helper_should_parse_version_flags() {
         for flag in ["--version", "-v"] {
-            let args = vec!["devenv".to_string(), flag.to_string()];
-
-            assert_eq!(cli_helper(&args), Some(CliHelper::Version));
+            assert_eq!(parse_args(&args(&[flag]), false), Ok(Mode::Version));
         }
     }
 
     #[test]
-    fn cli_helper_should_prefer_help_over_later_install_args() {
-        let args = vec![
-            "devenv".to_string(),
-            "--help".to_string(),
-            "--all".to_string(),
-        ];
-
-        assert_eq!(cli_helper(&args), Some(CliHelper::Help));
+    fn parse_args_should_prefer_help_over_other_args() {
+        assert_eq!(
+            parse_args(&args(&["--all", "--bogus", "--help"]), false),
+            Ok(Mode::Help)
+        );
     }
 }

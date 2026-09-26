@@ -17,8 +17,7 @@ where
     F: FnMut(&str) + Send + 'static,
 {
     log("Checking for mise...");
-    let existing_mise = mise_bin();
-    if existing_mise != "mise" || crate::sys::check_command_exists("mise") {
+    if is_installed() {
         log("mise is already installed.");
         return Ok(());
     }
@@ -39,6 +38,10 @@ where
     } else {
         Err(anyhow!("Failed to install mise: {}", result.stderr.trim()))
     }
+}
+
+pub fn is_installed() -> bool {
+    mise_bin() != "mise" || crate::sys::check_command_exists("mise")
 }
 
 pub fn mise_bin() -> String {

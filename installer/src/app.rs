@@ -41,8 +41,20 @@ impl App {
         let home = std::env::var("HOME").unwrap_or_default();
         let mut components = get_all_components();
 
-        for component in &mut components {
-            component.observed = observe_component(component, &home);
+        // Detection spawns `mise ls` and `--version` per component; run the
+        // probes concurrently so startup stays fast.
+        let observed: Vec<ObservedState> = std::thread::scope(|scope| {
+            let handles: Vec<_> = components
+                .iter()
+                .map(|component| scope.spawn(|| observe_component(component, &home)))
+                .collect();
+            handles
+                .into_iter()
+                .map(|handle| handle.join().unwrap_or(ObservedState::Unknown))
+                .collect()
+        });
+        for (component, observed) in components.iter_mut().zip(observed) {
+            component.observed = observed;
         }
 
         let curated = manifest::load_manifest();

@@ -20,6 +20,24 @@ pub fn draw(f: &mut Frame, app: &mut App) {
     }
 }
 
+pub fn draw_loading(f: &mut Frame) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(3), Constraint::Min(3)])
+        .split(f.area());
+    f.render_widget(
+        Paragraph::new(" devenv-linux Interactive Installer ")
+            .style(theme::title_style())
+            .block(theme::default_block()),
+        chunks[0],
+    );
+    f.render_widget(
+        Paragraph::new(" Detecting installed tools and configurations…")
+            .block(theme::default_block()),
+        chunks[1],
+    );
+}
+
 fn draw_selection(f: &mut Frame, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -210,7 +228,7 @@ fn draw_review(f: &mut Frame, app: &App) {
         .constraints([
             Constraint::Length(3),
             Constraint::Min(6),
-            Constraint::Length(5),
+            Constraint::Length(7),
             Constraint::Length(3),
         ])
         .split(f.area());
@@ -269,6 +287,28 @@ fn draw_review(f: &mut Frame, app: &App) {
             Span::raw("mise will be installed if it is missing."),
         ]));
     }
+    for (command, reason) in plan.required_commands() {
+        if (command == "curl" && crate::installer::mise::is_installed())
+            || crate::sys::check_command_exists(command)
+        {
+            continue;
+        }
+        if plan.installs_base_deps() {
+            notes.push(Line::from(vec![
+                Span::styled("Prerequisite: ", theme::shortcut_key_style()),
+                Span::raw(format!(
+                    "{command} for {reason} will be installed by Base Dependencies."
+                )),
+            ]));
+        } else {
+            notes.push(Line::from(Span::styled(
+                format!(
+                    "Missing: {command} is required for {reason}; select Base Dependencies or install it."
+                ),
+                Style::default().fg(theme::COLOR_WARNING),
+            )));
+        }
+    }
     if plan.needs_sudo() {
         notes.push(Line::from(vec![
             Span::styled("Privilege: ", theme::shortcut_key_style()),
@@ -304,18 +344,22 @@ fn draw_installing(f: &mut Frame, app: &mut App) {
         .constraints([Constraint::Length(3), Constraint::Min(10)])
         .split(f.area());
 
+    let phases = crate::executor::PHASES;
+    let done = app.install_done.load(Ordering::Acquire);
     let phase = app.install_index.load(Ordering::Relaxed);
-    const PHASES: f64 = 3.0;
-    let phase_labels = ["System Packages", "Mise Tools", "Configurations"];
-    let label = phase_labels.get(phase).copied().unwrap_or("Finishing…");
-    let progress = ((phase as f64) / PHASES).clamp(0.0, 1.0);
+    let title = match phases.get(phase) {
+        Some(label) if !done => {
+            format!(" Installing: {label} ({}/{}) ", phase + 1, phases.len())
+        }
+        _ => " Finished: press <Enter> to view the summary ".to_string(),
+    };
+    let progress = if done {
+        1.0
+    } else {
+        (phase as f64 / phases.len() as f64).clamp(0.0, 1.0)
+    };
     let gauge = Gauge::default()
-        .block(theme::default_block().title(format!(
-            " Installing: {} ({}/{}) ",
-            label,
-            phase + 1,
-            PHASES as usize
-        )))
+        .block(theme::default_block().title(title))
         .gauge_style(
             Style::default()
                 .fg(theme::COLOR_SUCCESS)
@@ -330,7 +374,7 @@ fn draw_installing(f: &mut Frame, app: &mut App) {
         .map(|logs| {
             logs.iter()
                 .rev()
-                .take(f.area().height as usize - 5)
+                .take((f.area().height as usize).saturating_sub(5))
                 .rev()
                 .cloned()
                 .collect::<Vec<String>>()
