@@ -20,6 +20,8 @@ devenv-linux/
 ├── DEVELOPMENT.md
 ├── README.md
 ├── devenv.example.toml
+├── docs/
+│   └── images/          # README screenshots (SVG)
 ├── .github/
 │   ├── scripts/
 │   │   └── verify-install.sh
@@ -100,6 +102,11 @@ devenv-linux/
 - Install progress uses atomics: `install_done: AtomicBool` and `install_index: AtomicUsize`.
 - Reports must use recorded per-component outcomes: Succeeded, Failed, Already configured, Deactivated, or Kept.
 - Keep installer code simple and explicit; prefer fallible helpers over panics. Installer-thread panics are caught and reported.
+
+## Documentation
+
+- Keep `README.md` short: pitch, one-line quick start, what you get, brief non-interactive usage.
+- `docs/images/*.svg` are captured from real terminal sessions (the TUI, fish, bat, fzf, zellij) and rendered to SVG. Recapture them when the TUI layout changes noticeably; do not hand-edit or fabricate output.
 
 ## Run Locally
 

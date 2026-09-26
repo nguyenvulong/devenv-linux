@@ -10,14 +10,16 @@ pub enum Group {
 }
 
 impl Group {
+    /// Labels use emoji with default emoji presentation (no U+FE0F variation
+    /// selector) so every terminal and ratatui agree they are two cells wide.
     pub fn label(&self) -> &'static str {
         match self {
-            Group::System => "🖥️  System",
+            Group::System => "💻  System",
             Group::Shells => "🐚  Shells",
-            Group::Editor => "✏️  Editor",
-            Group::Languages => "🛠️  Languages",
+            Group::Editor => "📝  Editor",
+            Group::Languages => "🧰  Languages",
             Group::CliTools => "🔧  CLI Tools",
-            Group::Configurations => "⚙️  Configurations",
+            Group::Configurations => "🧩  Configurations",
             Group::ExtraTools => "📦  Extra Tools",
         }
     }
@@ -442,6 +444,21 @@ mod tests {
             None,
             &[],
         )
+    }
+
+    #[test]
+    fn group_labels_should_not_use_variation_selectors() {
+        for group in [
+            Group::System,
+            Group::Shells,
+            Group::Editor,
+            Group::Languages,
+            Group::CliTools,
+            Group::Configurations,
+            Group::ExtraTools,
+        ] {
+            assert!(!group.label().contains('\u{fe0f}'), "{}", group.label());
+        }
     }
 
     #[test]

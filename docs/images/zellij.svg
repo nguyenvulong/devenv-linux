@@ -1,0 +1,452 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1141 678" width="1141" height="678" role="img" aria-label="zellij — panes with fish, bat, ripgrep, fd, mise">
+<style>text{font-family:'JetBrains Mono','Fira Code','DejaVu Sans Mono',Menlo,Consolas,monospace;font-size:14px;white-space:pre}</style>
+<rect width="1141" height="678" rx="10" fill="#1e1f29"/>
+<rect width="1141" height="34" rx="10" fill="#2b2d3a"/>
+<rect y="24" width="1141" height="10" fill="#2b2d3a"/>
+<circle cx="20" cy="17" r="6" fill="#ff5f57"/><circle cx="40" cy="17" r="6" fill="#febc2e"/><circle cx="60" cy="17" r="6" fill="#28c840"/>
+<text x="570" y="22" fill="#9a9cb0" text-anchor="middle" style="font-size:13px">zellij — panes with fish, bat, ripgrep, fd, mise</text>
+<rect x="16.0" y="50" width="142.8" height="18" fill="#000000"/>
+<text x="24.4" y="63.5" fill="#ffffff" font-weight="bold" textLength="126.0" lengthAdjust="spacingAndGlyphs">Zellij (devenv)</text>
+<rect x="158.8" y="50" width="67.2" height="18" fill="#50fa7b"/>
+<text x="167.2" y="63.5" fill="#000000" font-weight="bold" textLength="50.4" lengthAdjust="spacingAndGlyphs">Tab #1</text>
+<rect x="226.0" y="50" width="756.0" height="18" fill="#000000"/>
+<rect x="982.0" y="50" width="33.6" height="18" fill="#000000"/>
+<text x="990.4" y="63.5" fill="#ffb86c" font-weight="bold" textLength="25.2" lengthAdjust="spacingAndGlyphs">Alt</text>
+<rect x="1015.6" y="50" width="16.8" height="18" fill="#000000"/>
+<text x="1024.0" y="63.5" fill="#ffffff" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">&lt;</text>
+<rect x="1032.4" y="50" width="16.8" height="18" fill="#000000"/>
+<text x="1032.4" y="63.5" fill="#ffb86c" font-weight="bold" textLength="16.8" lengthAdjust="spacingAndGlyphs">[]</text>
+<rect x="1049.2" y="50" width="16.8" height="18" fill="#000000"/>
+<text x="1049.2" y="63.5" fill="#ffffff" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">&gt;</text>
+<rect x="1066.0" y="50" width="50.4" height="18" fill="#50fa7b"/>
+<text x="1074.4" y="63.5" fill="#000000" font-weight="bold" textLength="33.6" lengthAdjust="spacingAndGlyphs">BASE</text>
+<rect x="1116.4" y="50" width="8.4" height="18" fill="#000000"/>
+<text x="16.0" y="81.5" fill="#e6e6e6" font-weight="bold" textLength="1108.8" lengthAdjust="spacingAndGlyphs">┌ code ─────────────────────────────────────────────────────────────────┐┌ search ─────────────────────────────────────────────────┐</text>
+<text x="16.0" y="99.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="24.4" y="99.5" fill="#69ff94" textLength="25.2" lengthAdjust="spacingAndGlyphs">dev</text>
+<text x="49.6" y="99.5" fill="#e6e6e6" textLength="58.8" lengthAdjust="spacingAndGlyphs">@devbox</text>
+<text x="116.8" y="99.5" fill="#50fa7b" textLength="117.6" lengthAdjust="spacingAndGlyphs">~/devenv-linux</text>
+<text x="234.4" y="99.5" fill="#e6e6e6" textLength="8.4" lengthAdjust="spacingAndGlyphs">&gt;</text>
+<text x="251.2" y="99.5" fill="#6272a4" textLength="25.2" lengthAdjust="spacingAndGlyphs">bat</text>
+<text x="284.8" y="99.5" fill="#8be9fd" textLength="25.2" lengthAdjust="spacingAndGlyphs">-Pn</text>
+<text x="318.4" y="99.5" fill="#8be9fd" textLength="16.8" lengthAdjust="spacingAndGlyphs">-r</text>
+<text x="343.6" y="99.5" fill="#8be9fd" textLength="42.0" lengthAdjust="spacingAndGlyphs">42:66</text>
+<text x="394.0" y="99.5" fill="#8be9fd" textLength="168.0" lengthAdjust="spacingAndGlyphs">installer/src/sys.rs</text>
+<text x="620.8" y="99.5" fill="#e6e6e6" font-weight="bold" textLength="16.8" lengthAdjust="spacingAndGlyphs">││</text>
+<text x="637.6" y="99.5" fill="#69ff94" textLength="25.2" lengthAdjust="spacingAndGlyphs">dev</text>
+<text x="662.8" y="99.5" fill="#e6e6e6" textLength="58.8" lengthAdjust="spacingAndGlyphs">@devbox</text>
+<text x="730.0" y="99.5" fill="#50fa7b" textLength="117.6" lengthAdjust="spacingAndGlyphs">~/devenv-linux</text>
+<text x="847.6" y="99.5" fill="#e6e6e6" textLength="8.4" lengthAdjust="spacingAndGlyphs">&gt;</text>
+<text x="864.4" y="99.5" fill="#6272a4" textLength="16.8" lengthAdjust="spacingAndGlyphs">rg</text>
+<text x="889.6" y="99.5" fill="#8be9fd" textLength="16.8" lengthAdjust="spacingAndGlyphs">-c</text>
+<text x="914.8" y="99.5" fill="#f1fa8c" textLength="42.0" lengthAdjust="spacingAndGlyphs">'fn '</text>
+<text x="965.2" y="99.5" fill="#8be9fd" textLength="109.2" lengthAdjust="spacingAndGlyphs">installer/src</text>
+<text x="1116.4" y="99.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="117.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.2" y="117.5" fill="#444444" textLength="16.8" lengthAdjust="spacingAndGlyphs">42</text>
+<text x="620.8" y="117.5" fill="#e6e6e6" font-weight="bold" textLength="16.8" lengthAdjust="spacingAndGlyphs">││</text>
+<text x="637.6" y="117.5" fill="#ff79c6" textLength="210.0" lengthAdjust="spacingAndGlyphs">installer/src/manifest.rs</text>
+<text x="847.6" y="117.5" fill="#e6e6e6" textLength="25.2" lengthAdjust="spacingAndGlyphs">:10</text>
+<text x="1116.4" y="117.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="135.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.2" y="135.5" fill="#444444" textLength="16.8" lengthAdjust="spacingAndGlyphs">43</text>
+<text x="100.0" y="135.5" fill="#8be9fd" textLength="25.2" lengthAdjust="spacingAndGlyphs">let</text>
+<text x="133.6" y="135.5" fill="#f8f8f2" textLength="67.2" lengthAdjust="spacingAndGlyphs">(tx, rx)</text>
+<text x="209.2" y="135.5" fill="#ff79c6" textLength="8.4" lengthAdjust="spacingAndGlyphs">=</text>
+<text x="226.0" y="135.5" fill="#66d9ef" textLength="25.2" lengthAdjust="spacingAndGlyphs">std</text>
+<text x="251.2" y="135.5" fill="#ff79c6" textLength="16.8" lengthAdjust="spacingAndGlyphs">::</text>
+<text x="268.0" y="135.5" fill="#66d9ef" textLength="33.6" lengthAdjust="spacingAndGlyphs">sync</text>
+<text x="301.6" y="135.5" fill="#ff79c6" textLength="16.8" lengthAdjust="spacingAndGlyphs">::</text>
+<text x="318.4" y="135.5" fill="#66d9ef" textLength="33.6" lengthAdjust="spacingAndGlyphs">mpsc</text>
+<text x="352.0" y="135.5" fill="#ff79c6" textLength="16.8" lengthAdjust="spacingAndGlyphs">::</text>
+<text x="368.8" y="135.5" fill="#f8f8f2" textLength="84.0" lengthAdjust="spacingAndGlyphs">channel();</text>
+<text x="620.8" y="135.5" fill="#e6e6e6" font-weight="bold" textLength="16.8" lengthAdjust="spacingAndGlyphs">││</text>
+<text x="637.6" y="135.5" fill="#ff79c6" textLength="210.0" lengthAdjust="spacingAndGlyphs">installer/src/executor.rs</text>
+<text x="847.6" y="135.5" fill="#e6e6e6" textLength="16.8" lengthAdjust="spacingAndGlyphs">:2</text>
+<text x="1116.4" y="135.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="153.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.2" y="153.5" fill="#444444" textLength="16.8" lengthAdjust="spacingAndGlyphs">44</text>
+<text x="100.0" y="153.5" fill="#8be9fd" textLength="25.2" lengthAdjust="spacingAndGlyphs">let</text>
+<text x="133.6" y="153.5" fill="#f8f8f2" textLength="50.4" lengthAdjust="spacingAndGlyphs">tx_err</text>
+<text x="192.4" y="153.5" fill="#ff79c6" textLength="8.4" lengthAdjust="spacingAndGlyphs">=</text>
+<text x="209.2" y="153.5" fill="#f8f8f2" textLength="16.8" lengthAdjust="spacingAndGlyphs">tx</text>
+<text x="226.0" y="153.5" fill="#ff79c6" textLength="8.4" lengthAdjust="spacingAndGlyphs">.</text>
+<text x="234.4" y="153.5" fill="#8be9fd" textLength="42.0" lengthAdjust="spacingAndGlyphs">clone</text>
+<text x="276.4" y="153.5" fill="#f8f8f2" textLength="25.2" lengthAdjust="spacingAndGlyphs">();</text>
+<text x="620.8" y="153.5" fill="#e6e6e6" font-weight="bold" textLength="16.8" lengthAdjust="spacingAndGlyphs">││</text>
+<text x="637.6" y="153.5" fill="#ff79c6" textLength="184.8" lengthAdjust="spacingAndGlyphs">installer/src/theme.rs</text>
+<text x="822.4" y="153.5" fill="#e6e6e6" textLength="25.2" lengthAdjust="spacingAndGlyphs">:10</text>
+<text x="1116.4" y="153.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="171.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.2" y="171.5" fill="#444444" textLength="16.8" lengthAdjust="spacingAndGlyphs">45</text>
+<text x="620.8" y="171.5" fill="#e6e6e6" font-weight="bold" textLength="16.8" lengthAdjust="spacingAndGlyphs">││</text>
+<text x="637.6" y="171.5" fill="#ff79c6" textLength="168.0" lengthAdjust="spacingAndGlyphs">installer/src/sys.rs</text>
+<text x="805.6" y="171.5" fill="#e6e6e6" textLength="25.2" lengthAdjust="spacingAndGlyphs">:16</text>
+<text x="1116.4" y="171.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="189.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.2" y="189.5" fill="#444444" textLength="16.8" lengthAdjust="spacingAndGlyphs">46</text>
+<text x="100.0" y="189.5" fill="#8be9fd" textLength="25.2" lengthAdjust="spacingAndGlyphs">let</text>
+<text x="133.6" y="189.5" fill="#f8f8f2" textLength="109.2" lengthAdjust="spacingAndGlyphs">stdout_thread</text>
+<text x="251.2" y="189.5" fill="#ff79c6" textLength="8.4" lengthAdjust="spacingAndGlyphs">=</text>
+<text x="268.0" y="189.5" fill="#66d9ef" textLength="50.4" lengthAdjust="spacingAndGlyphs">thread</text>
+<text x="318.4" y="189.5" fill="#ff79c6" textLength="16.8" lengthAdjust="spacingAndGlyphs">::</text>
+<text x="335.2" y="189.5" fill="#f8f8f2" textLength="50.4" lengthAdjust="spacingAndGlyphs">spawn(</text>
+<text x="385.6" y="189.5" fill="#ff79c6" textLength="33.6" lengthAdjust="spacingAndGlyphs">move</text>
+<text x="427.6" y="189.5" fill="#ff79c6" textLength="16.8" lengthAdjust="spacingAndGlyphs">||</text>
+<text x="452.8" y="189.5" fill="#ffffff" textLength="8.4" lengthAdjust="spacingAndGlyphs">{</text>
+<text x="620.8" y="189.5" fill="#e6e6e6" font-weight="bold" textLength="16.8" lengthAdjust="spacingAndGlyphs">││</text>
+<text x="637.6" y="189.5" fill="#ff79c6" textLength="176.4" lengthAdjust="spacingAndGlyphs">installer/src/main.rs</text>
+<text x="814.0" y="189.5" fill="#e6e6e6" textLength="25.2" lengthAdjust="spacingAndGlyphs">:35</text>
+<text x="1116.4" y="189.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="207.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.2" y="207.5" fill="#444444" textLength="16.8" lengthAdjust="spacingAndGlyphs">47</text>
+<text x="133.6" y="207.5" fill="#8be9fd" textLength="25.2" lengthAdjust="spacingAndGlyphs">let</text>
+<text x="167.2" y="207.5" fill="#ff79c6" textLength="25.2" lengthAdjust="spacingAndGlyphs">mut</text>
+<text x="200.8" y="207.5" fill="#f8f8f2" textLength="84.0" lengthAdjust="spacingAndGlyphs">stdout_str</text>
+<text x="293.2" y="207.5" fill="#ff79c6" textLength="8.4" lengthAdjust="spacingAndGlyphs">=</text>
+<text x="310.0" y="207.5" fill="#66d9ef" textLength="50.4" lengthAdjust="spacingAndGlyphs">String</text>
+<text x="360.4" y="207.5" fill="#ff79c6" textLength="16.8" lengthAdjust="spacingAndGlyphs">::</text>
+<text x="377.2" y="207.5" fill="#f8f8f2" textLength="50.4" lengthAdjust="spacingAndGlyphs">new();</text>
+<text x="620.8" y="207.5" fill="#e6e6e6" font-weight="bold" textLength="16.8" lengthAdjust="spacingAndGlyphs">││</text>
+<text x="637.6" y="207.5" fill="#ff79c6" textLength="210.0" lengthAdjust="spacingAndGlyphs">installer/src/registry.rs</text>
+<text x="847.6" y="207.5" fill="#e6e6e6" textLength="25.2" lengthAdjust="spacingAndGlyphs">:30</text>
+<text x="1116.4" y="207.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="225.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.2" y="225.5" fill="#444444" textLength="16.8" lengthAdjust="spacingAndGlyphs">48</text>
+<text x="133.6" y="225.5" fill="#8be9fd" textLength="25.2" lengthAdjust="spacingAndGlyphs">let</text>
+<text x="167.2" y="225.5" fill="#f8f8f2" textLength="50.4" lengthAdjust="spacingAndGlyphs">reader</text>
+<text x="226.0" y="225.5" fill="#ff79c6" textLength="8.4" lengthAdjust="spacingAndGlyphs">=</text>
+<text x="242.8" y="225.5" fill="#66d9ef" textLength="75.6" lengthAdjust="spacingAndGlyphs">BufReader</text>
+<text x="318.4" y="225.5" fill="#ff79c6" textLength="16.8" lengthAdjust="spacingAndGlyphs">::</text>
+<text x="335.2" y="225.5" fill="#f8f8f2" textLength="100.8" lengthAdjust="spacingAndGlyphs">new(stdout);</text>
+<text x="620.8" y="225.5" fill="#e6e6e6" font-weight="bold" textLength="16.8" lengthAdjust="spacingAndGlyphs">││</text>
+<text x="637.6" y="225.5" fill="#ff79c6" textLength="159.6" lengthAdjust="spacingAndGlyphs">installer/src/ui.rs</text>
+<text x="797.2" y="225.5" fill="#e6e6e6" textLength="16.8" lengthAdjust="spacingAndGlyphs">:7</text>
+<text x="1116.4" y="225.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="243.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.2" y="243.5" fill="#444444" textLength="16.8" lengthAdjust="spacingAndGlyphs">49</text>
+<text x="133.6" y="243.5" fill="#ff79c6" textLength="25.2" lengthAdjust="spacingAndGlyphs">for</text>
+<text x="167.2" y="243.5" fill="#f8f8f2" textLength="33.6" lengthAdjust="spacingAndGlyphs">line</text>
+<text x="209.2" y="243.5" fill="#ff79c6" textLength="16.8" lengthAdjust="spacingAndGlyphs">in</text>
+<text x="234.4" y="243.5" fill="#f8f8f2" textLength="50.4" lengthAdjust="spacingAndGlyphs">reader</text>
+<text x="284.8" y="243.5" fill="#ff79c6" textLength="8.4" lengthAdjust="spacingAndGlyphs">.</text>
+<text x="293.2" y="243.5" fill="#8be9fd" textLength="42.0" lengthAdjust="spacingAndGlyphs">lines</text>
+<text x="335.2" y="243.5" fill="#f8f8f2" textLength="16.8" lengthAdjust="spacingAndGlyphs">()</text>
+<text x="352.0" y="243.5" fill="#ff79c6" textLength="8.4" lengthAdjust="spacingAndGlyphs">.</text>
+<text x="360.4" y="243.5" fill="#8be9fd" textLength="75.6" lengthAdjust="spacingAndGlyphs">map_while</text>
+<text x="436.0" y="243.5" fill="#f8f8f2" textLength="8.4" lengthAdjust="spacingAndGlyphs">(</text>
+<text x="444.4" y="243.5" fill="#66d9ef" textLength="50.4" lengthAdjust="spacingAndGlyphs">Result</text>
+<text x="494.8" y="243.5" fill="#ff79c6" textLength="16.8" lengthAdjust="spacingAndGlyphs">::</text>
+<text x="511.6" y="243.5" fill="#f8f8f2" textLength="25.2" lengthAdjust="spacingAndGlyphs">ok)</text>
+<text x="545.2" y="243.5" fill="#ffffff" textLength="8.4" lengthAdjust="spacingAndGlyphs">{</text>
+<text x="620.8" y="243.5" fill="#e6e6e6" font-weight="bold" textLength="16.8" lengthAdjust="spacingAndGlyphs">││</text>
+<text x="637.6" y="243.5" fill="#ff79c6" textLength="277.2" lengthAdjust="spacingAndGlyphs">installer/src/installer/system.rs</text>
+<text x="914.8" y="243.5" fill="#e6e6e6" textLength="16.8" lengthAdjust="spacingAndGlyphs">:1</text>
+<text x="1116.4" y="243.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="261.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.2" y="261.5" fill="#444444" textLength="16.8" lengthAdjust="spacingAndGlyphs">50</text>
+<text x="167.2" y="261.5" fill="#f8f8f2" textLength="84.0" lengthAdjust="spacingAndGlyphs">stdout_str</text>
+<text x="251.2" y="261.5" fill="#ff79c6" textLength="8.4" lengthAdjust="spacingAndGlyphs">.</text>
+<text x="259.6" y="261.5" fill="#8be9fd" textLength="67.2" lengthAdjust="spacingAndGlyphs">push_str</text>
+<text x="326.8" y="261.5" fill="#f8f8f2" textLength="8.4" lengthAdjust="spacingAndGlyphs">(</text>
+<text x="335.2" y="261.5" fill="#ff79c6" textLength="8.4" lengthAdjust="spacingAndGlyphs">&amp;</text>
+<text x="343.6" y="261.5" fill="#f8f8f2" textLength="50.4" lengthAdjust="spacingAndGlyphs">line);</text>
+<text x="620.8" y="261.5" fill="#e6e6e6" font-weight="bold" textLength="16.8" lengthAdjust="spacingAndGlyphs">││</text>
+<text x="637.6" y="261.5" fill="#ff79c6" textLength="277.2" lengthAdjust="spacingAndGlyphs">installer/src/installer/config.rs</text>
+<text x="914.8" y="261.5" fill="#e6e6e6" textLength="25.2" lengthAdjust="spacingAndGlyphs">:23</text>
+<text x="1116.4" y="261.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="279.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.2" y="279.5" fill="#444444" textLength="16.8" lengthAdjust="spacingAndGlyphs">51</text>
+<text x="167.2" y="279.5" fill="#f8f8f2" textLength="84.0" lengthAdjust="spacingAndGlyphs">stdout_str</text>
+<text x="251.2" y="279.5" fill="#ff79c6" textLength="8.4" lengthAdjust="spacingAndGlyphs">.</text>
+<text x="259.6" y="279.5" fill="#8be9fd" textLength="33.6" lengthAdjust="spacingAndGlyphs">push</text>
+<text x="293.2" y="279.5" fill="#f8f8f2" textLength="8.4" lengthAdjust="spacingAndGlyphs">(</text>
+<text x="301.6" y="279.5" fill="#f1fa8c" textLength="8.4" lengthAdjust="spacingAndGlyphs">'</text>
+<text x="310.0" y="279.5" fill="#ff79c6" textLength="16.8" lengthAdjust="spacingAndGlyphs">\n</text>
+<text x="326.8" y="279.5" fill="#f1fa8c" textLength="8.4" lengthAdjust="spacingAndGlyphs">'</text>
+<text x="335.2" y="279.5" fill="#f8f8f2" textLength="16.8" lengthAdjust="spacingAndGlyphs">);</text>
+<text x="620.8" y="279.5" fill="#e6e6e6" font-weight="bold" textLength="16.8" lengthAdjust="spacingAndGlyphs">││</text>
+<text x="637.6" y="279.5" fill="#ff79c6" textLength="260.4" lengthAdjust="spacingAndGlyphs">installer/src/installer/mise.rs</text>
+<text x="898.0" y="279.5" fill="#e6e6e6" textLength="25.2" lengthAdjust="spacingAndGlyphs">:21</text>
+<text x="1116.4" y="279.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="297.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.2" y="297.5" fill="#444444" textLength="16.8" lengthAdjust="spacingAndGlyphs">52</text>
+<text x="167.2" y="297.5" fill="#8be9fd" textLength="25.2" lengthAdjust="spacingAndGlyphs">let</text>
+<text x="200.8" y="297.5" fill="#ff79c6" textLength="8.4" lengthAdjust="spacingAndGlyphs">_</text>
+<text x="217.6" y="297.5" fill="#ff79c6" textLength="8.4" lengthAdjust="spacingAndGlyphs">=</text>
+<text x="234.4" y="297.5" fill="#f8f8f2" textLength="16.8" lengthAdjust="spacingAndGlyphs">tx</text>
+<text x="251.2" y="297.5" fill="#ff79c6" textLength="8.4" lengthAdjust="spacingAndGlyphs">.</text>
+<text x="259.6" y="297.5" fill="#8be9fd" textLength="33.6" lengthAdjust="spacingAndGlyphs">send</text>
+<text x="293.2" y="297.5" fill="#f8f8f2" textLength="58.8" lengthAdjust="spacingAndGlyphs">(line);</text>
+<text x="620.8" y="297.5" fill="#e6e6e6" font-weight="bold" textLength="16.8" lengthAdjust="spacingAndGlyphs">││</text>
+<text x="637.6" y="297.5" fill="#ff79c6" textLength="168.0" lengthAdjust="spacingAndGlyphs">installer/src/app.rs</text>
+<text x="805.6" y="297.5" fill="#e6e6e6" textLength="25.2" lengthAdjust="spacingAndGlyphs">:27</text>
+<text x="1116.4" y="297.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="315.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.2" y="315.5" fill="#444444" textLength="16.8" lengthAdjust="spacingAndGlyphs">53</text>
+<text x="133.6" y="315.5" fill="#ffffff" textLength="8.4" lengthAdjust="spacingAndGlyphs">}</text>
+<text x="620.8" y="315.5" fill="#e6e6e6" font-weight="bold" textLength="16.8" lengthAdjust="spacingAndGlyphs">││</text>
+<text x="637.6" y="315.5" fill="#ff79c6" textLength="268.8" lengthAdjust="spacingAndGlyphs">installer/src/headless_config.rs</text>
+<text x="906.4" y="315.5" fill="#e6e6e6" textLength="25.2" lengthAdjust="spacingAndGlyphs">:12</text>
+<text x="1116.4" y="315.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="333.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.2" y="333.5" fill="#444444" textLength="16.8" lengthAdjust="spacingAndGlyphs">54</text>
+<text x="133.6" y="333.5" fill="#f8f8f2" textLength="84.0" lengthAdjust="spacingAndGlyphs">stdout_str</text>
+<text x="620.8" y="333.5" fill="#e6e6e6" font-weight="bold" textLength="16.8" lengthAdjust="spacingAndGlyphs">││</text>
+<text x="637.6" y="333.5" fill="#69ff94" textLength="25.2" lengthAdjust="spacingAndGlyphs">dev</text>
+<text x="662.8" y="333.5" fill="#e6e6e6" textLength="58.8" lengthAdjust="spacingAndGlyphs">@devbox</text>
+<text x="730.0" y="333.5" fill="#50fa7b" textLength="117.6" lengthAdjust="spacingAndGlyphs">~/devenv-linux</text>
+<text x="847.6" y="333.5" fill="#e6e6e6" textLength="8.4" lengthAdjust="spacingAndGlyphs">&gt;</text>
+<text x="1116.4" y="333.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="351.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.2" y="351.5" fill="#444444" textLength="16.8" lengthAdjust="spacingAndGlyphs">55</text>
+<text x="100.0" y="351.5" fill="#ffffff" textLength="8.4" lengthAdjust="spacingAndGlyphs">}</text>
+<text x="108.4" y="351.5" fill="#f8f8f2" textLength="16.8" lengthAdjust="spacingAndGlyphs">);</text>
+<text x="620.8" y="351.5" fill="#e6e6e6" font-weight="bold" textLength="504.0" lengthAdjust="spacingAndGlyphs">│└─────────────────────────────────────────────────────────┘</text>
+<text x="16.0" y="369.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.2" y="369.5" fill="#444444" textLength="16.8" lengthAdjust="spacingAndGlyphs">56</text>
+<text x="620.8" y="369.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="629.2" y="369.5" fill="#50fa7b" font-weight="bold" textLength="495.6" lengthAdjust="spacingAndGlyphs">┌ tools ──────────────────────────────────────────────────┐</text>
+<text x="16.0" y="387.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.2" y="387.5" fill="#444444" textLength="16.8" lengthAdjust="spacingAndGlyphs">57</text>
+<text x="100.0" y="387.5" fill="#8be9fd" textLength="25.2" lengthAdjust="spacingAndGlyphs">let</text>
+<text x="133.6" y="387.5" fill="#f8f8f2" textLength="109.2" lengthAdjust="spacingAndGlyphs">stderr_thread</text>
+<text x="251.2" y="387.5" fill="#ff79c6" textLength="8.4" lengthAdjust="spacingAndGlyphs">=</text>
+<text x="268.0" y="387.5" fill="#66d9ef" textLength="50.4" lengthAdjust="spacingAndGlyphs">thread</text>
+<text x="318.4" y="387.5" fill="#ff79c6" textLength="16.8" lengthAdjust="spacingAndGlyphs">::</text>
+<text x="335.2" y="387.5" fill="#f8f8f2" textLength="50.4" lengthAdjust="spacingAndGlyphs">spawn(</text>
+<text x="385.6" y="387.5" fill="#ff79c6" textLength="33.6" lengthAdjust="spacingAndGlyphs">move</text>
+<text x="427.6" y="387.5" fill="#ff79c6" textLength="16.8" lengthAdjust="spacingAndGlyphs">||</text>
+<text x="452.8" y="387.5" fill="#ffffff" textLength="8.4" lengthAdjust="spacingAndGlyphs">{</text>
+<text x="620.8" y="387.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="629.2" y="387.5" fill="#50fa7b" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="637.6" y="387.5" fill="#69ff94" textLength="25.2" lengthAdjust="spacingAndGlyphs">dev</text>
+<text x="662.8" y="387.5" fill="#e6e6e6" textLength="58.8" lengthAdjust="spacingAndGlyphs">@devbox</text>
+<text x="730.0" y="387.5" fill="#50fa7b" textLength="117.6" lengthAdjust="spacingAndGlyphs">~/devenv-linux</text>
+<text x="847.6" y="387.5" fill="#e6e6e6" textLength="8.4" lengthAdjust="spacingAndGlyphs">&gt;</text>
+<text x="864.4" y="387.5" fill="#6272a4" textLength="33.6" lengthAdjust="spacingAndGlyphs">mise</text>
+<text x="906.4" y="387.5" fill="#8be9fd" textLength="16.8" lengthAdjust="spacingAndGlyphs">ls</text>
+<text x="1116.4" y="387.5" fill="#50fa7b" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="405.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.2" y="405.5" fill="#444444" textLength="16.8" lengthAdjust="spacingAndGlyphs">58</text>
+<text x="133.6" y="405.5" fill="#8be9fd" textLength="25.2" lengthAdjust="spacingAndGlyphs">let</text>
+<text x="167.2" y="405.5" fill="#ff79c6" textLength="25.2" lengthAdjust="spacingAndGlyphs">mut</text>
+<text x="200.8" y="405.5" fill="#f8f8f2" textLength="84.0" lengthAdjust="spacingAndGlyphs">stderr_str</text>
+<text x="293.2" y="405.5" fill="#ff79c6" textLength="8.4" lengthAdjust="spacingAndGlyphs">=</text>
+<text x="310.0" y="405.5" fill="#66d9ef" textLength="50.4" lengthAdjust="spacingAndGlyphs">String</text>
+<text x="360.4" y="405.5" fill="#ff79c6" textLength="16.8" lengthAdjust="spacingAndGlyphs">::</text>
+<text x="377.2" y="405.5" fill="#f8f8f2" textLength="50.4" lengthAdjust="spacingAndGlyphs">new();</text>
+<text x="620.8" y="405.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="629.2" y="405.5" fill="#50fa7b" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="637.6" y="405.5" fill="#ff00ff" textLength="436.8" lengthAdjust="spacingAndGlyphs">Tool  Version  Source                      Requested</text>
+<text x="1116.4" y="405.5" fill="#50fa7b" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="423.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.2" y="423.5" fill="#444444" textLength="16.8" lengthAdjust="spacingAndGlyphs">59</text>
+<text x="133.6" y="423.5" fill="#8be9fd" textLength="25.2" lengthAdjust="spacingAndGlyphs">let</text>
+<text x="167.2" y="423.5" fill="#f8f8f2" textLength="50.4" lengthAdjust="spacingAndGlyphs">reader</text>
+<text x="226.0" y="423.5" fill="#ff79c6" textLength="8.4" lengthAdjust="spacingAndGlyphs">=</text>
+<text x="242.8" y="423.5" fill="#66d9ef" textLength="75.6" lengthAdjust="spacingAndGlyphs">BufReader</text>
+<text x="318.4" y="423.5" fill="#ff79c6" textLength="16.8" lengthAdjust="spacingAndGlyphs">::</text>
+<text x="335.2" y="423.5" fill="#f8f8f2" textLength="100.8" lengthAdjust="spacingAndGlyphs">new(stderr);</text>
+<text x="620.8" y="423.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="629.2" y="423.5" fill="#50fa7b" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="637.6" y="423.5" fill="#5c5cff" textLength="33.6" lengthAdjust="spacingAndGlyphs">node</text>
+<text x="688.0" y="423.5" fill="#00ff00" textLength="58.8" lengthAdjust="spacingAndGlyphs">26.10.0</text>
+<text x="763.6" y="423.5" fill="#e6e6e6" textLength="285.6" lengthAdjust="spacingAndGlyphs">~/.config/mise/config.toml  latest</text>
+<text x="1116.4" y="423.5" fill="#50fa7b" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="441.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.2" y="441.5" fill="#444444" textLength="16.8" lengthAdjust="spacingAndGlyphs">60</text>
+<text x="133.6" y="441.5" fill="#ff79c6" textLength="25.2" lengthAdjust="spacingAndGlyphs">for</text>
+<text x="167.2" y="441.5" fill="#f8f8f2" textLength="33.6" lengthAdjust="spacingAndGlyphs">line</text>
+<text x="209.2" y="441.5" fill="#ff79c6" textLength="16.8" lengthAdjust="spacingAndGlyphs">in</text>
+<text x="234.4" y="441.5" fill="#f8f8f2" textLength="50.4" lengthAdjust="spacingAndGlyphs">reader</text>
+<text x="284.8" y="441.5" fill="#ff79c6" textLength="8.4" lengthAdjust="spacingAndGlyphs">.</text>
+<text x="293.2" y="441.5" fill="#8be9fd" textLength="42.0" lengthAdjust="spacingAndGlyphs">lines</text>
+<text x="335.2" y="441.5" fill="#f8f8f2" textLength="16.8" lengthAdjust="spacingAndGlyphs">()</text>
+<text x="352.0" y="441.5" fill="#ff79c6" textLength="8.4" lengthAdjust="spacingAndGlyphs">.</text>
+<text x="360.4" y="441.5" fill="#8be9fd" textLength="75.6" lengthAdjust="spacingAndGlyphs">map_while</text>
+<text x="436.0" y="441.5" fill="#f8f8f2" textLength="8.4" lengthAdjust="spacingAndGlyphs">(</text>
+<text x="444.4" y="441.5" fill="#66d9ef" textLength="50.4" lengthAdjust="spacingAndGlyphs">Result</text>
+<text x="494.8" y="441.5" fill="#ff79c6" textLength="16.8" lengthAdjust="spacingAndGlyphs">::</text>
+<text x="511.6" y="441.5" fill="#f8f8f2" textLength="25.2" lengthAdjust="spacingAndGlyphs">ok)</text>
+<text x="545.2" y="441.5" fill="#ffffff" textLength="8.4" lengthAdjust="spacingAndGlyphs">{</text>
+<text x="620.8" y="441.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="629.2" y="441.5" fill="#50fa7b" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="637.6" y="441.5" fill="#69ff94" textLength="25.2" lengthAdjust="spacingAndGlyphs">dev</text>
+<text x="662.8" y="441.5" fill="#e6e6e6" textLength="58.8" lengthAdjust="spacingAndGlyphs">@devbox</text>
+<text x="730.0" y="441.5" fill="#50fa7b" textLength="117.6" lengthAdjust="spacingAndGlyphs">~/devenv-linux</text>
+<text x="847.6" y="441.5" fill="#e6e6e6" textLength="8.4" lengthAdjust="spacingAndGlyphs">&gt;</text>
+<text x="864.4" y="441.5" fill="#6272a4" textLength="16.8" lengthAdjust="spacingAndGlyphs">fd</text>
+<text x="889.6" y="441.5" fill="#8be9fd" textLength="16.8" lengthAdjust="spacingAndGlyphs">-e</text>
+<text x="914.8" y="441.5" fill="#8be9fd" textLength="33.6" lengthAdjust="spacingAndGlyphs">toml</text>
+<text x="1116.4" y="441.5" fill="#50fa7b" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="459.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.2" y="459.5" fill="#444444" textLength="16.8" lengthAdjust="spacingAndGlyphs">61</text>
+<text x="167.2" y="459.5" fill="#f8f8f2" textLength="84.0" lengthAdjust="spacingAndGlyphs">stderr_str</text>
+<text x="251.2" y="459.5" fill="#ff79c6" textLength="8.4" lengthAdjust="spacingAndGlyphs">.</text>
+<text x="259.6" y="459.5" fill="#8be9fd" textLength="67.2" lengthAdjust="spacingAndGlyphs">push_str</text>
+<text x="326.8" y="459.5" fill="#f8f8f2" textLength="8.4" lengthAdjust="spacingAndGlyphs">(</text>
+<text x="335.2" y="459.5" fill="#ff79c6" textLength="8.4" lengthAdjust="spacingAndGlyphs">&amp;</text>
+<text x="343.6" y="459.5" fill="#f8f8f2" textLength="50.4" lengthAdjust="spacingAndGlyphs">line);</text>
+<text x="620.8" y="459.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="629.2" y="459.5" fill="#50fa7b" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="637.6" y="459.5" fill="#e6e6e6" textLength="159.6" lengthAdjust="spacingAndGlyphs">devenv.example.toml</text>
+<text x="1116.4" y="459.5" fill="#50fa7b" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="477.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.2" y="477.5" fill="#444444" textLength="16.8" lengthAdjust="spacingAndGlyphs">62</text>
+<text x="167.2" y="477.5" fill="#f8f8f2" textLength="84.0" lengthAdjust="spacingAndGlyphs">stderr_str</text>
+<text x="251.2" y="477.5" fill="#ff79c6" textLength="8.4" lengthAdjust="spacingAndGlyphs">.</text>
+<text x="259.6" y="477.5" fill="#8be9fd" textLength="33.6" lengthAdjust="spacingAndGlyphs">push</text>
+<text x="293.2" y="477.5" fill="#f8f8f2" textLength="8.4" lengthAdjust="spacingAndGlyphs">(</text>
+<text x="301.6" y="477.5" fill="#f1fa8c" textLength="8.4" lengthAdjust="spacingAndGlyphs">'</text>
+<text x="310.0" y="477.5" fill="#ff79c6" textLength="16.8" lengthAdjust="spacingAndGlyphs">\n</text>
+<text x="326.8" y="477.5" fill="#f1fa8c" textLength="8.4" lengthAdjust="spacingAndGlyphs">'</text>
+<text x="335.2" y="477.5" fill="#f8f8f2" textLength="16.8" lengthAdjust="spacingAndGlyphs">);</text>
+<text x="620.8" y="477.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="629.2" y="477.5" fill="#50fa7b" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="637.6" y="477.5" fill="#a4ffff" font-weight="bold" textLength="84.0" lengthAdjust="spacingAndGlyphs">installer/</text>
+<text x="721.6" y="477.5" fill="#e6e6e6" textLength="84.0" lengthAdjust="spacingAndGlyphs">Cargo.toml</text>
+<text x="1116.4" y="477.5" fill="#50fa7b" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="495.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.2" y="495.5" fill="#444444" textLength="16.8" lengthAdjust="spacingAndGlyphs">63</text>
+<text x="167.2" y="495.5" fill="#8be9fd" textLength="25.2" lengthAdjust="spacingAndGlyphs">let</text>
+<text x="200.8" y="495.5" fill="#ff79c6" textLength="8.4" lengthAdjust="spacingAndGlyphs">_</text>
+<text x="217.6" y="495.5" fill="#ff79c6" textLength="8.4" lengthAdjust="spacingAndGlyphs">=</text>
+<text x="234.4" y="495.5" fill="#f8f8f2" textLength="50.4" lengthAdjust="spacingAndGlyphs">tx_err</text>
+<text x="284.8" y="495.5" fill="#ff79c6" textLength="8.4" lengthAdjust="spacingAndGlyphs">.</text>
+<text x="293.2" y="495.5" fill="#8be9fd" textLength="33.6" lengthAdjust="spacingAndGlyphs">send</text>
+<text x="326.8" y="495.5" fill="#f8f8f2" textLength="58.8" lengthAdjust="spacingAndGlyphs">(line);</text>
+<text x="620.8" y="495.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="629.2" y="495.5" fill="#50fa7b" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="637.6" y="495.5" fill="#a4ffff" font-weight="bold" textLength="84.0" lengthAdjust="spacingAndGlyphs">installer/</text>
+<text x="721.6" y="495.5" fill="#e6e6e6" textLength="151.2" lengthAdjust="spacingAndGlyphs">mise_registry.toml</text>
+<text x="1116.4" y="495.5" fill="#50fa7b" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="513.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.2" y="513.5" fill="#444444" textLength="16.8" lengthAdjust="spacingAndGlyphs">64</text>
+<text x="133.6" y="513.5" fill="#ffffff" textLength="8.4" lengthAdjust="spacingAndGlyphs">}</text>
+<text x="620.8" y="513.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="629.2" y="513.5" fill="#50fa7b" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="637.6" y="513.5" fill="#69ff94" textLength="25.2" lengthAdjust="spacingAndGlyphs">dev</text>
+<text x="662.8" y="513.5" fill="#e6e6e6" textLength="58.8" lengthAdjust="spacingAndGlyphs">@devbox</text>
+<text x="730.0" y="513.5" fill="#50fa7b" textLength="117.6" lengthAdjust="spacingAndGlyphs">~/devenv-linux</text>
+<text x="847.6" y="513.5" fill="#e6e6e6" textLength="8.4" lengthAdjust="spacingAndGlyphs">&gt;</text>
+<text x="1116.4" y="513.5" fill="#50fa7b" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="531.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.2" y="531.5" fill="#444444" textLength="16.8" lengthAdjust="spacingAndGlyphs">65</text>
+<text x="133.6" y="531.5" fill="#f8f8f2" textLength="84.0" lengthAdjust="spacingAndGlyphs">stderr_str</text>
+<text x="620.8" y="531.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="629.2" y="531.5" fill="#50fa7b" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="1116.4" y="531.5" fill="#50fa7b" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="549.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="41.2" y="549.5" fill="#444444" textLength="16.8" lengthAdjust="spacingAndGlyphs">66</text>
+<text x="100.0" y="549.5" fill="#ffffff" textLength="8.4" lengthAdjust="spacingAndGlyphs">}</text>
+<text x="108.4" y="549.5" fill="#f8f8f2" textLength="16.8" lengthAdjust="spacingAndGlyphs">);</text>
+<text x="620.8" y="549.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="629.2" y="549.5" fill="#50fa7b" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="1116.4" y="549.5" fill="#50fa7b" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="567.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="24.4" y="567.5" fill="#69ff94" textLength="25.2" lengthAdjust="spacingAndGlyphs">dev</text>
+<text x="49.6" y="567.5" fill="#e6e6e6" textLength="58.8" lengthAdjust="spacingAndGlyphs">@devbox</text>
+<text x="116.8" y="567.5" fill="#50fa7b" textLength="117.6" lengthAdjust="spacingAndGlyphs">~/devenv-linux</text>
+<text x="234.4" y="567.5" fill="#e6e6e6" textLength="8.4" lengthAdjust="spacingAndGlyphs">&gt;</text>
+<text x="620.8" y="567.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="629.2" y="567.5" fill="#50fa7b" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="1116.4" y="567.5" fill="#50fa7b" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="585.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="620.8" y="585.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="629.2" y="585.5" fill="#50fa7b" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="1116.4" y="585.5" fill="#50fa7b" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="603.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="620.8" y="603.5" fill="#e6e6e6" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="629.2" y="603.5" fill="#50fa7b" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="1116.4" y="603.5" fill="#50fa7b" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">│</text>
+<text x="16.0" y="621.5" fill="#e6e6e6" font-weight="bold" textLength="613.2" lengthAdjust="spacingAndGlyphs">└───────────────────────────────────────────────────────────────────────┘</text>
+<text x="629.2" y="621.5" fill="#50fa7b" font-weight="bold" textLength="495.6" lengthAdjust="spacingAndGlyphs">└─────────────────────────────────────────────────────────┘</text>
+<rect x="16.0" y="626" width="67.2" height="18" fill="#000000"/>
+<text x="24.4" y="639.5" fill="#ffffff" font-weight="bold" textLength="50.4" lengthAdjust="spacingAndGlyphs">Ctrl +</text>
+<rect x="83.2" y="626" width="16.8" height="18" fill="#f8f8f2"/>
+<text x="91.6" y="639.5" fill="#000000" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">&lt;</text>
+<rect x="100.0" y="626" width="8.4" height="18" fill="#f8f8f2"/>
+<text x="100.0" y="639.5" fill="#ff5555" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">g</text>
+<rect x="108.4" y="626" width="58.8" height="18" fill="#f8f8f2"/>
+<text x="108.4" y="639.5" fill="#000000" font-weight="bold" textLength="50.4" lengthAdjust="spacingAndGlyphs">&gt; LOCK</text>
+<rect x="167.2" y="626" width="16.8" height="18" fill="#000000"/>
+<text x="175.6" y="639.5" fill="#000000" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">&lt;</text>
+<rect x="184.0" y="626" width="8.4" height="18" fill="#000000"/>
+<text x="184.0" y="639.5" fill="#ff5555" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">p</text>
+<rect x="192.4" y="626" width="58.8" height="18" fill="#000000"/>
+<text x="192.4" y="639.5" fill="#000000" font-weight="bold" textLength="50.4" lengthAdjust="spacingAndGlyphs">&gt; PANE</text>
+<rect x="251.2" y="626" width="16.8" height="18" fill="#f8f8f2"/>
+<text x="259.6" y="639.5" fill="#000000" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">&lt;</text>
+<rect x="268.0" y="626" width="8.4" height="18" fill="#f8f8f2"/>
+<text x="268.0" y="639.5" fill="#ff5555" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">t</text>
+<rect x="276.4" y="626" width="50.4" height="18" fill="#f8f8f2"/>
+<text x="276.4" y="639.5" fill="#000000" font-weight="bold" textLength="42.0" lengthAdjust="spacingAndGlyphs">&gt; TAB</text>
+<rect x="326.8" y="626" width="16.8" height="18" fill="#000000"/>
+<text x="335.2" y="639.5" fill="#000000" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">&lt;</text>
+<rect x="343.6" y="626" width="8.4" height="18" fill="#000000"/>
+<text x="343.6" y="639.5" fill="#ff5555" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">n</text>
+<rect x="352.0" y="626" width="75.6" height="18" fill="#000000"/>
+<text x="352.0" y="639.5" fill="#000000" font-weight="bold" textLength="67.2" lengthAdjust="spacingAndGlyphs">&gt; RESIZE</text>
+<rect x="427.6" y="626" width="16.8" height="18" fill="#f8f8f2"/>
+<text x="436.0" y="639.5" fill="#000000" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">&lt;</text>
+<rect x="444.4" y="626" width="8.4" height="18" fill="#f8f8f2"/>
+<text x="444.4" y="639.5" fill="#ff5555" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">h</text>
+<rect x="452.8" y="626" width="58.8" height="18" fill="#f8f8f2"/>
+<text x="452.8" y="639.5" fill="#000000" font-weight="bold" textLength="50.4" lengthAdjust="spacingAndGlyphs">&gt; MOVE</text>
+<rect x="511.6" y="626" width="16.8" height="18" fill="#000000"/>
+<text x="520.0" y="639.5" fill="#000000" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">&lt;</text>
+<rect x="528.4" y="626" width="8.4" height="18" fill="#000000"/>
+<text x="528.4" y="639.5" fill="#ff5555" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">s</text>
+<rect x="536.8" y="626" width="75.6" height="18" fill="#000000"/>
+<text x="536.8" y="639.5" fill="#000000" font-weight="bold" textLength="67.2" lengthAdjust="spacingAndGlyphs">&gt; SEARCH</text>
+<rect x="612.4" y="626" width="16.8" height="18" fill="#f8f8f2"/>
+<text x="620.8" y="639.5" fill="#000000" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">&lt;</text>
+<rect x="629.2" y="626" width="8.4" height="18" fill="#f8f8f2"/>
+<text x="629.2" y="639.5" fill="#ff5555" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">o</text>
+<rect x="637.6" y="626" width="84.0" height="18" fill="#f8f8f2"/>
+<text x="637.6" y="639.5" fill="#000000" font-weight="bold" textLength="75.6" lengthAdjust="spacingAndGlyphs">&gt; SESSION</text>
+<rect x="721.6" y="626" width="16.8" height="18" fill="#000000"/>
+<text x="730.0" y="639.5" fill="#000000" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">&lt;</text>
+<rect x="738.4" y="626" width="8.4" height="18" fill="#000000"/>
+<text x="738.4" y="639.5" fill="#ff5555" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">q</text>
+<rect x="746.8" y="626" width="58.8" height="18" fill="#000000"/>
+<text x="746.8" y="639.5" fill="#000000" font-weight="bold" textLength="50.4" lengthAdjust="spacingAndGlyphs">&gt; QUIT</text>
+<rect x="805.6" y="626" width="151.2" height="18" fill="#000000"/>
+<rect x="956.8" y="626" width="25.2" height="18" fill="#000000"/>
+<text x="956.8" y="639.5" fill="#ffb86c" font-weight="bold" textLength="25.2" lengthAdjust="spacingAndGlyphs">Alt</text>
+<rect x="982.0" y="626" width="33.6" height="18" fill="#000000"/>
+<text x="990.4" y="639.5" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs">+ &lt;</text>
+<rect x="1015.6" y="626" width="16.8" height="18" fill="#000000"/>
+<text x="1015.6" y="639.5" fill="#50fa7b" font-weight="bold" textLength="16.8" lengthAdjust="spacingAndGlyphs">[]</text>
+<rect x="1032.4" y="626" width="8.4" height="18" fill="#000000"/>
+<text x="1032.4" y="639.5" fill="#ffffff" textLength="8.4" lengthAdjust="spacingAndGlyphs">&gt;</text>
+<rect x="1040.8" y="626" width="8.4" height="18" fill="#000000"/>
+<rect x="1049.2" y="626" width="50.4" height="18" fill="#50fa7b"/>
+<text x="1057.6" y="639.5" fill="#000000" font-weight="bold" textLength="33.6" lengthAdjust="spacingAndGlyphs">BASE</text>
+<rect x="1099.6" y="626" width="8.4" height="18" fill="#000000"/>
+<rect x="1108.0" y="626" width="16.8" height="18" fill="#000000"/>
+<text x="24.4" y="657.5" fill="#e6e6e6" textLength="33.6" lengthAdjust="spacingAndGlyphs">Tip:</text>
+<text x="66.4" y="657.5" fill="#ffb86c" font-weight="bold" textLength="25.2" lengthAdjust="spacingAndGlyphs">Alt</text>
+<text x="100.0" y="657.5" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs">+ &lt;</text>
+<text x="125.2" y="657.5" fill="#50fa7b" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">n</text>
+<text x="133.6" y="657.5" fill="#ffffff" textLength="8.4" lengthAdjust="spacingAndGlyphs">&gt;</text>
+<text x="150.4" y="657.5" fill="#e6e6e6" textLength="100.8" lengthAdjust="spacingAndGlyphs">=&gt; new pane.</text>
+<text x="259.6" y="657.5" fill="#ffb86c" font-weight="bold" textLength="25.2" lengthAdjust="spacingAndGlyphs">Alt</text>
+<text x="293.2" y="657.5" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs">+ &lt;</text>
+<text x="318.4" y="657.5" fill="#50fa7b" font-weight="bold" textLength="33.6" lengthAdjust="spacingAndGlyphs">←↓↑→</text>
+<text x="352.0" y="657.5" fill="#ffffff" textLength="8.4" lengthAdjust="spacingAndGlyphs">&gt;</text>
+<text x="368.8" y="657.5" fill="#e6e6e6" textLength="16.8" lengthAdjust="spacingAndGlyphs">or</text>
+<text x="394.0" y="657.5" fill="#ffb86c" font-weight="bold" textLength="25.2" lengthAdjust="spacingAndGlyphs">Alt</text>
+<text x="427.6" y="657.5" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs">+ &lt;</text>
+<text x="452.8" y="657.5" fill="#50fa7b" font-weight="bold" textLength="33.6" lengthAdjust="spacingAndGlyphs">hjkl</text>
+<text x="486.4" y="657.5" fill="#ffffff" textLength="8.4" lengthAdjust="spacingAndGlyphs">&gt;</text>
+<text x="503.2" y="657.5" fill="#e6e6e6" textLength="100.8" lengthAdjust="spacingAndGlyphs">=&gt; navigate.</text>
+<text x="612.4" y="657.5" fill="#ffb86c" font-weight="bold" textLength="25.2" lengthAdjust="spacingAndGlyphs">Alt</text>
+<text x="646.0" y="657.5" fill="#ffffff" textLength="25.2" lengthAdjust="spacingAndGlyphs">+ &lt;</text>
+<text x="671.2" y="657.5" fill="#50fa7b" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">+</text>
+<text x="679.6" y="657.5" fill="#ffffff" textLength="8.4" lengthAdjust="spacingAndGlyphs">|</text>
+<text x="688.0" y="657.5" fill="#50fa7b" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs">-</text>
+<text x="696.4" y="657.5" fill="#ffffff" textLength="8.4" lengthAdjust="spacingAndGlyphs">&gt;</text>
+<text x="713.2" y="657.5" fill="#e6e6e6" textLength="126.0" lengthAdjust="spacingAndGlyphs">=&gt; resize pane.</text>
+</svg>
