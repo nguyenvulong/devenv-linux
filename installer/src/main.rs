@@ -479,8 +479,50 @@ fn spawn_installation(app: &mut App) {
 
 fn push_log(logs: &Arc<Mutex<Vec<String>>>, message: impl Into<String>) {
     if let Ok(mut guard) = logs.lock() {
-        guard.push(message.into());
+        guard.extend(log_lines(&message.into()));
     }
+}
+
+/// Split a message into display lines and drop terminal control sequences.
+/// Tool output (e.g. mise) may contain ANSI colors, and raw escapes or
+/// newlines written into a ratatui buffer corrupt the TUI layout.
+fn log_lines(message: &str) -> Vec<String> {
+    message
+        .split('\n')
+        .map(|line| strip_control(line.rsplit('\r').next().unwrap_or_default()))
+        .collect()
+}
+
+fn strip_control(line: &str) -> String {
+    let mut out = String::with_capacity(line.len());
+    let mut chars = line.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '\x1b' => match chars.next() {
+                // CSI: ESC [ parameters... final byte in @..~
+                Some('[') => {
+                    for c in chars.by_ref() {
+                        if ('@'..='~').contains(&c) {
+                            break;
+                        }
+                    }
+                }
+                // OSC: ESC ] ... terminated by BEL or ESC \
+                Some(']') => {
+                    while let Some(c) = chars.next() {
+                        if c == '\x07' || (c == '\x1b' && chars.next_if_eq(&'\\').is_some()) {
+                            break;
+                        }
+                    }
+                }
+                _ => {}
+            },
+            '\t' => out.push_str("    "),
+            c if c.is_control() => {}
+            c => out.push(c),
+        }
+    }
+    out
 }
 
 fn set_outcome(
@@ -495,7 +537,23 @@ fn set_outcome(
 
 #[cfg(test)]
 mod tests {
-    use super::{InstallPlan, Mode, handle_selection_action_key, parse_args};
+    use super::{InstallPlan, Mode, handle_selection_action_key, log_lines, parse_args};
+
+    #[test]
+    fn log_lines_should_strip_escapes_and_split_newlines() {
+        assert_eq!(
+            log_lines("\n>>> Phase 2: Mise Tools"),
+            vec!["".to_string(), ">>> Phase 2: Mise Tools".to_string()]
+        );
+        assert_eq!(
+            log_lines("\x1b[2mmise\x1b[0m \x1b[38;5;11m⇢\x1b[0m node@26\tok"),
+            vec!["mise ⇢ node@26    ok".to_string()]
+        );
+        assert_eq!(
+            log_lines("\x1b]8;;https://x\x07link\x1b]8;;\x1b\\ 50%\r100%"),
+            vec!["100%".to_string()]
+        );
+    }
     use crate::app::{App, Screen};
     use crate::registry::{
         Category, Component, ComponentAction, ComponentOutcome, Group, ObservedState,
