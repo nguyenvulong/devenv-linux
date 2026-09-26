@@ -1,5 +1,8 @@
 use anyhow::{Context, Result, anyhow};
+use std::ffi::OsString;
 use std::io::{BufRead, BufReader};
+use std::os::unix::fs::PermissionsExt;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::thread;
 
@@ -82,21 +85,46 @@ where
 }
 
 pub fn check_command_exists(cmd: &str) -> bool {
-    let home = std::env::var("HOME").unwrap_or_default();
-    let mise_shims = std::path::PathBuf::from(&home).join(".local/share/mise/shims");
+    let path_var = std::env::var_os("PATH").unwrap_or_default();
+    std::env::split_paths(&path_var)
+        .chain(std::iter::once(mise_shims_dir()))
+        .any(|dir| is_executable(&dir.join(cmd)))
+}
 
-    let path_var = std::env::var("PATH").unwrap_or_default();
-    let mut dirs: Vec<std::path::PathBuf> = std::env::split_paths(&path_var).collect();
-    dirs.push(mise_shims);
+/// Resolve the mise shims directory the same way mise does:
+/// `$MISE_DATA_DIR`, then `$XDG_DATA_HOME/mise`, then `~/.local/share/mise`.
+pub fn mise_shims_dir() -> PathBuf {
+    mise_data_dir(
+        std::env::var_os("MISE_DATA_DIR"),
+        std::env::var_os("XDG_DATA_HOME"),
+        std::env::var_os("HOME"),
+    )
+    .join("shims")
+}
 
-    dirs.iter().any(|dir| dir.join(cmd).is_file())
+fn mise_data_dir(
+    mise_data_dir: Option<OsString>,
+    xdg_data_home: Option<OsString>,
+    home: Option<OsString>,
+) -> PathBuf {
+    let non_empty = |value: Option<OsString>| value.filter(|value| !value.is_empty());
+    if let Some(dir) = non_empty(mise_data_dir) {
+        return PathBuf::from(dir);
+    }
+    if let Some(dir) = non_empty(xdg_data_home) {
+        return PathBuf::from(dir).join("mise");
+    }
+    PathBuf::from(home.unwrap_or_default()).join(".local/share/mise")
+}
+
+fn is_executable(path: &Path) -> bool {
+    path.metadata()
+        .is_ok_and(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
 }
 
 pub fn is_root() -> bool {
-    Command::new("id")
-        .arg("-u")
-        .output()
-        .is_ok_and(|output| output.status.success() && output.stdout == b"0\n")
+    // SAFETY: geteuid has no preconditions and cannot fail.
+    unsafe { libc::geteuid() == 0 }
 }
 
 pub fn get_distro() -> DistroFamily {
@@ -168,7 +196,25 @@ fn parse_command_version_output(stdout: &str, stderr: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{DistroFamily, parse_command_version_output, parse_distro};
+    use super::{DistroFamily, mise_data_dir, parse_command_version_output, parse_distro};
+    use std::path::PathBuf;
+
+    #[test]
+    fn mise_data_dir_should_follow_mise_precedence() {
+        let some = |value: &str| Some(value.into());
+        assert_eq!(
+            mise_data_dir(some("/data/mise"), some("/xdg"), some("/home/u")),
+            PathBuf::from("/data/mise")
+        );
+        assert_eq!(
+            mise_data_dir(some(""), some("/xdg"), some("/home/u")),
+            PathBuf::from("/xdg/mise")
+        );
+        assert_eq!(
+            mise_data_dir(None, None, some("/home/u")),
+            PathBuf::from("/home/u/.local/share/mise")
+        );
+    }
 
     #[test]
     fn distro_fields_should_handle_quotes_tokens_and_id_precedence() {

@@ -20,15 +20,19 @@ devenv-linux/
 ├── DEVELOPMENT.md
 ├── README.md
 ├── devenv.example.toml
-├── .github/workflows/
-│   ├── test.yml
-│   └── release.yml
+├── .github/
+│   ├── scripts/
+│   │   └── verify-install.sh
+│   └── workflows/
+│       ├── test.yml
+│       └── release.yml
 └── installer/
     ├── Cargo.toml
     ├── Cargo.lock
     └── src/
         ├── main.rs
         ├── app.rs
+        ├── executor.rs
         ├── ui.rs
         ├── theme.rs
         ├── registry.rs
@@ -44,19 +48,20 @@ devenv-linux/
 
 ## Installer Flow
 
-1. `install.sh` detects architecture, downloads the latest release binary, extracts it, and runs `./devenv`.
-2. `main.rs` prints helper output and exits for `--help`/`-h` and `--version`/`-v`.
-3. `main.rs` enters full headless mode when `--all`, `CI=true`, or `INSTALLER_ALL=1` is set.
+1. `install.sh` detects architecture, checks for curl/wget, tar, and xz, downloads `<arch>.tar.xz` and `SHA256SUMS` from `/releases/latest/download/` (or the `DEVENV_VERSION` tag, or `DEVENV_DOWNLOAD_URL`), verifies the checksum, extracts, and runs `devenv` without `exec` so its temporary directory is cleaned up.
+2. `main.rs` parses arguments strictly: `--help`/`-h` and `--version`/`-v` win; unknown, duplicate, or conflicting (`--all` with `--config`) arguments exit with status 2.
+3. `main.rs` enters full headless mode for `--all` or `INSTALLER_ALL=1`. `CI=true` never triggers an install.
 4. `main.rs` enters config-driven headless mode when `--config <path>`, `--config=<path>`, or `-c <path>` is set.
 5. Config-driven headless mode reads TOML from `headless_config.rs`, selects only enabled component IDs, and applies pinned versions only to `mise` tools.
-6. The TUI loads the component list, observes PATH tools, existing configs, and globally configured mise versions, and loads the searchable `mise` manifest.
+6. The TUI refuses to start without a terminal on stdout or when `CI=true`. It installs a panic hook that restores the terminal, draws a loading screen, then probes PATH tools, existing configs, and globally configured mise versions concurrently, and loads the searchable `mise` manifest.
 7. Every TUI component starts at Keep. Users explicitly choose Install or, for globally configured mise tools only, Deactivate.
-8. Enter opens a review containing only planned mutations, kept count, implicit prerequisites, and replacement warnings. A second Enter confirms execution.
+8. Enter opens a review containing only planned mutations, kept count, implicit prerequisites (mise, plus missing `curl`/`git` commands), and replacement warnings. A second Enter confirms execution.
 9. After review confirmation, `sudo -v` runs in the normal terminal only if planned system-package installations need it.
-10. Installation runs in 3 phases and records each component outcome independently:
+10. `executor.rs` runs installation in 3 phases for both the TUI and headless modes and records each component outcome independently:
    - system packages
    - mise tools
    - configurations
+11. The TUI event loop always polls input with a timeout (never busy-waits). After installation the log stays visible until Enter opens the summary.
 
 ## Current Product Direction
 
@@ -65,7 +70,7 @@ devenv-linux/
 - No `tmux` or `nushell`
 - Search uses embedded `mise_registry.toml`, with runtime `mise registry` fallback when available
 - Config-driven headless installs use TOML component IDs from `devenv.example.toml`; mise tool versions default to `latest`
-- Release assets are named by architecture only (`x86_64.tar.xz`, `aarch64.tar.xz`) so `/releases/latest/download/...` URLs stay stable across versions.
+- Release assets are named by architecture only (`x86_64.tar.xz`, `aarch64.tar.xz`) so `/releases/latest/download/...` URLs stay stable across versions. Every release also publishes `SHA256SUMS` and build provenance attestations; `install.sh` refuses to run an unverified archive.
 
 ## Key Implementation Notes
 
@@ -79,10 +84,13 @@ devenv-linux/
 - Arch package installation uses existing databases with `pacman -S --needed`; users must complete a full system upgrade separately when databases/packages are stale. Never run a standalone `pacman -Sy`.
 - Root installations call package managers directly and do not require sudo.
 - Distro detection parses quoted ID values and whitespace-separated ID_LIKE tokens, including rhel.
-- Mise bootstrap downloads successfully to a temporary file before execution and verifies the resulting executable.
+- Mise bootstrap downloads successfully to a temporary file before execution and verifies the resulting executable. It requires `curl` and fails early with a clear message when it is missing; LazyVim similarly requires `git`.
+- Log the mise version (honoring `MISE_VERSION`) and the LazyVim starter commit for reproducibility.
+- Command detection requires the executable bit and checks the mise shims directory resolved from `MISE_DATA_DIR`, then `$XDG_DATA_HOME/mise`, then `~/.local/share/mise`. Root detection uses `geteuid()`.
 - Shell activation resolves mise on PATH with a ~/.local/bin fallback. Fish uses interactive activation and noninteractive --shims; Bash hooks run only interactively.
 - Explicit shell configuration installs migrate exact legacy installer activation lines with numbered backups, ignore commented activation when detecting setup, and preserve custom activation blocks.
-- Config installs should be non-destructive and back up existing user files when overwriting.
+- Config installs should be non-destructive and back up existing user files when overwriting. Shell config writes are atomic (temporary sibling + rename), preserve permissions, and follow symlinks so dotfile-manager links stay intact.
+- Default Fish config uses `fish_add_path --append` and defines colors, aliases, and the history wrapper only in interactive shells.
 - Explicit Neovim configuration installs must prepare a staging directory before touching the live config, use numbered `nvim.bak` backups, and restore the original if the final swap fails.
 - `devenv.example.toml` should include every built-in component from `registry.rs`.
 - Config-driven headless installs must reject unknown component IDs, duplicate entries, empty versions, and versions on non-`mise` components.
@@ -91,7 +99,7 @@ devenv-linux/
 - Install logs are shared through `Arc<Mutex<Vec<String>>>`.
 - Install progress uses atomics: `install_done: AtomicBool` and `install_index: AtomicUsize`.
 - Reports must use recorded per-component outcomes: Succeeded, Failed, Already configured, Deactivated, or Kept.
-- Keep installer code simple and explicit; prefer fallible helpers over panics.
+- Keep installer code simple and explicit; prefer fallible helpers over panics. Installer-thread panics are caught and reported.
 
 ## Run Locally
 
@@ -105,9 +113,13 @@ cargo build --release
 ./target/release/devenv --version
 ./target/release/devenv --config ../devenv.example.toml
 
-cargo test
+cargo fmt --check
 cargo clippy --all-targets --all-features --locked -- -D warnings
+cargo test --locked
+shellcheck ../install.sh ../.github/scripts/*.sh
 ```
+
+CI (`test.yml`) runs a `lint` job with the commands above plus an end-to-end `install.sh` checksum test, then the per-distro `--all` install matrix, which verifies results with `.github/scripts/verify-install.sh`.
 
 ## Branches
 
@@ -116,4 +128,6 @@ cargo clippy --all-targets --all-features --locked -- -D warnings
 
 Before releasing, merge `origin/main` into `dev`, then bump the package version in both `installer/Cargo.toml` and `installer/Cargo.lock` to an unused version. CI runs on `dev` pushes and PRs targeting `dev` or `main`. After checks pass, merge the `dev` → `main` release PR with a merge commit (never squash or rebase), create an annotated `v<version>` tag on that merged commit, and push the tag to publish the release. Merge the released `main` back into `dev` to preserve shared ancestry and version consistency.
 
-Use Conventional Commits: `feat:`, `fix:`, `docs:`, `chore:`.
+Feature branches target `dev` and are squash-merged, one commit per logical change. Only the `dev` → `main` release PR uses a merge commit.
+
+Use Conventional Commits: `feat:`, `fix:`, `docs:`, `chore:`, `ci:`.

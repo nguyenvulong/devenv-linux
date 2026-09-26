@@ -8,8 +8,52 @@ on:
   workflow_dispatch:
 
 jobs:
+  # ── Fast checks: formatting, lints, unit tests, bootstrap script ─────────
+  lint:
+    name: Lint and unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Check formatting
+        run: cargo fmt --check
+        working-directory: installer
+
+      - name: Clippy
+        run: cargo clippy --all-targets --all-features --locked -- -D warnings
+        working-directory: installer
+
+      - name: Unit and integration tests
+        run: cargo test --locked
+        working-directory: installer
+
+      - name: Shellcheck
+        run: shellcheck install.sh .github/scripts/*.sh
+
+      # Exercise install.sh end to end against a locally packaged release,
+      # including checksum verification and rejection of a tampered archive.
+      - name: Test install.sh
+        run: |
+          cargo build --release --locked --manifest-path installer/Cargo.toml
+          dist=$(mktemp -d)
+          cp installer/target/release/devenv "$dist/devenv"
+          (cd "$dist" && tar -cJf x86_64.tar.xz devenv && sha256sum x86_64.tar.xz > SHA256SUMS)
+          DEVENV_DOWNLOAD_URL="file://$dist" bash install.sh --version
+          echo tampered >> "$dist/x86_64.tar.xz"
+          if DEVENV_DOWNLOAD_URL="file://$dist" bash install.sh --version; then
+            echo "install.sh accepted a tampered archive"
+            exit 1
+          fi
+
+  # ── Full installation on each supported distro ───────────────────────────
   test:
     name: Test on ${{ matrix.distro }}
+    needs: lint
     runs-on: ubuntu-latest
     timeout-minutes: 60
     strategy:
@@ -57,141 +101,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
 
-      # ── Install Rust and build the devenv binary ───────────────────────────
-      # Always build as the Actions runner (root/runner) who owns the cargo
-      # installation from dtolnay/rust-toolchain. The compiled binary is then
-      # handed to testuser to run — avoiding 'cargo: command not found' inside
-      # `su - testuser -c` which spawns a login shell with a different $PATH.
+      # Build as the Actions runner, which owns the toolchain, then hand the
+      # binary to testuser (a `su -` login shell has a different $PATH).
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Run regression tests
-        run: cargo test --locked
-        working-directory: installer
-
       - name: Build devenv
-        run: cargo build --release
+        run: cargo build --release --locked
         working-directory: installer
 
-      # ── Run the installer in headless mode ─────────────────────────────────
-      # --all forces headless mode: selects all components, no TUI, no TTY needed.
-
-      - name: Run installer (as user)
-        if: ${{ !matrix.run_as_root }}
+      # ── Install and verify ────────────────────────────────────────────────
+      # --all forces headless mode: selects all components, no TUI, no TTY.
+      - name: Run installer and verify
+        shell: bash
         run: |
-          chown -R testuser:testuser .
-          su - testuser -c "$(pwd)/installer/target/release/devenv --all"
-        shell: bash
-
-      - name: Run installer (as root)
-        if: ${{ matrix.run_as_root }}
-        run: installer/target/release/devenv --all
-        shell: bash
-
-      # ── Verify tools ──────────────────────────────────────────────────────
-      # mise binary:  ~/.local/bin/mise
-      # mise shims:   ~/.local/share/mise/shims/
-      # cargo:        ~/.cargo/bin/
-      # set -e ensures any missing tool fails the step immediately.
-
-      - name: Verify tool installations (as user)
-        if: ${{ !matrix.run_as_root }}
-        run: |
-          su - testuser -c '
-            set -e
-            export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$HOME/.cargo/bin:$PATH"
-            echo "=== Checking installed tools ==="
-            mise --version
-            fzf --version
-            rg --version
-            fd --version
-            bat --version
-            eza --version
-            glow --version
-            jaq --version
-            zellij --version
-            rustc --version && cargo --version
-            node --version
-            go version
-            uv --version
-            nvim --version
-            fish --version
-            echo "=== All tools verified ==="
-          '
-        shell: bash
-
-      - name: Verify tool installations (as root)
-        if: ${{ matrix.run_as_root }}
-        run: |
-          set -e
-          export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$HOME/.cargo/bin:$PATH"
-          echo "=== Checking installed tools ==="
-          mise --version
-          fzf --version
-          rg --version
-          fd --version
-          bat --version
-          eza --version
-          glow --version
-          jaq --version
-          zellij --version
-          rustc --version && cargo --version
-          node --version
-          go version
-          uv --version
-          nvim --version
-          fish --version
-          echo "=== All tools verified ==="
-        shell: bash
-
-      # ── Verify configurations ─────────────────────────────────────────────
-
-      - name: Verify configurations (as user)
-        if: ${{ !matrix.run_as_root }}
-        run: |
-          su - testuser -c '
-            set -e
-            [ -d ~/.config/nvim ]  || { echo "Missing nvim config";  exit 1; }
-            [ -d ~/.config/fish ]  || { echo "Missing fish config";  exit 1; }
-            echo "=== All configurations verified ==="
-          '
-        shell: bash
-
-      - name: Verify configurations (as root)
-        if: ${{ matrix.run_as_root }}
-        run: |
-          set -e
-          [ -d ~/.config/nvim ]  || { echo "Missing nvim config";  exit 1; }
-          [ -d ~/.config/fish ]  || { echo "Missing fish config";  exit 1; }
-          echo "=== All configurations verified ==="
-        shell: bash
-
-      # ── Smoke-test key tools ──────────────────────────────────────────────
-
-      - name: Smoke test (as user)
-        if: ${{ !matrix.run_as_root }}
-        run: |
-          su - testuser -c '
-            set -e
-            export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$HOME/.cargo/bin:$PATH"
-            echo "test" | fzf -f "test"
-            echo "test content" > /tmp/test.txt && rg "test" /tmp/test.txt
-            node -e "console.log(\"Hello from Node.js\")"
-            go version > /dev/null
-            rustc --version > /dev/null
-            echo "=== Smoke tests passed ==="
-          '
-        shell: bash
-
-      - name: Smoke test (as root)
-        if: ${{ matrix.run_as_root }}
-        run: |
-          set -e
-          export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$HOME/.cargo/bin:$PATH"
-          echo "test" | fzf -f "test"
-          echo "test content" > /tmp/test.txt && rg "test" /tmp/test.txt
-          node -e "console.log(\"Hello from Node.js\")"
-          go version > /dev/null
-          rustc --version > /dev/null
-          echo "=== Smoke tests passed ==="
-        shell: bash
+          if [ "${{ matrix.run_as_root }}" = "true" ]; then
+            as_target() { bash -c "$1"; }
+          else
+            chown -R testuser:testuser .
+            as_target() { su - testuser -c "$1"; }
+          fi
+          as_target "$PWD/installer/target/release/devenv --all"
+          as_target "bash $PWD/.github/scripts/verify-install.sh"

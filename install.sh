@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
-# install.sh — thin bootstrap that downloads and runs the latest devenv release.
+# install.sh — thin bootstrap that downloads, verifies, and runs a devenv release.
 # Source: https://github.com/nguyenvulong/devenv-linux
+#
+# Environment:
+#   DEVENV_VERSION        Release tag to install (e.g. v1.1.0). Defaults to the latest release.
+#   DEVENV_DOWNLOAD_URL   Base URL holding <arch>.tar.xz and SHA256SUMS (mirrors/testing).
 
 set -euo pipefail
 
@@ -9,56 +13,98 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 NC='\033[0m'
+DEVENV_TMP=""
 
-# ── Detect architecture ───────────────────────────────────────────────────────
-ARCH=$(uname -m)
-case "$ARCH" in
-  x86_64)  ARCH_LABEL="x86_64" ;;
-  aarch64) ARCH_LABEL="aarch64" ;;
-  arm64)   ARCH_LABEL="aarch64" ;;  # macOS arm64 alias
-  *)
-    echo -e "${RED}Unsupported architecture: $ARCH${NC}"
-    echo "Pre-built binaries are available for x86_64 and aarch64 only."
-    exit 1
-    ;;
-esac
-
-# ── Fetch latest release version ─────────────────────────────────────────────
-echo -e "${BLUE}Fetching latest devenv release...${NC}"
-if command -v curl &>/dev/null; then
-  VERSION=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
-    | grep '"tag_name"' | sed 's/.*"v\([^"]*\)".*/\1/')
-elif command -v wget &>/dev/null; then
-  VERSION=$(wget -qO- "https://api.github.com/repos/${REPO}/releases/latest" \
-    | grep '"tag_name"' | sed 's/.*"v\([^"]*\)".*/\1/')
-else
-  echo -e "${RED}Neither curl nor wget found. Install one and try again.${NC}"
+die() {
+  echo -e "${RED}$*${NC}" >&2
   exit 1
-fi
+}
 
-if [ -z "$VERSION" ]; then
-  echo -e "${RED}Could not determine latest release version. Check your internet connection.${NC}"
-  exit 1
-fi
+download() {
+  local url="$1" dest="$2"
+  if command -v curl &>/dev/null; then
+    curl -fsSL --retry 3 "$url" -o "$dest"
+  else
+    wget -q --tries=3 -O "$dest" "$url"
+  fi
+}
 
-echo -e "${BLUE}Latest version: v${VERSION}${NC}"
+sha256_check() {
+  if command -v sha256sum &>/dev/null; then
+    sha256sum -c --status -
+  elif command -v shasum &>/dev/null; then
+    shasum -a 256 -c --status -
+  else
+    die "Neither sha256sum nor shasum found; cannot verify the download."
+  fi
+}
 
-# ── Download and extract ──────────────────────────────────────────────────────
-ARCHIVE="${ARCH_LABEL}.tar.xz"
-URL="https://github.com/${REPO}/releases/download/v${VERSION}/${ARCHIVE}"
-TMPDIR=$(mktemp -d)
-trap 'rm -rf "$TMPDIR"' EXIT
+# Everything runs inside main so a truncated `curl | bash` download never
+# executes a partial script.
+main() {
+  # ── Detect architecture ─────────────────────────────────────────────────────
+  local arch
+  case "$(uname -m)" in
+    x86_64) arch="x86_64" ;;
+    aarch64 | arm64) arch="aarch64" ;;
+    *)
+      die "Unsupported architecture: $(uname -m)
+Pre-built binaries are available for x86_64 and aarch64 only."
+      ;;
+  esac
 
-echo -e "${BLUE}Downloading ${ARCHIVE}...${NC}"
-if command -v curl &>/dev/null; then
-  curl -fsSL "$URL" -o "${TMPDIR}/${ARCHIVE}"
-else
-  wget -qO "${TMPDIR}/${ARCHIVE}" "$URL"
-fi
+  # ── Check required tools ────────────────────────────────────────────────────
+  command -v curl &>/dev/null || command -v wget &>/dev/null \
+    || die "Neither curl nor wget found. Install one and try again."
+  command -v tar &>/dev/null || die "tar is required. Install it and try again."
+  command -v xz &>/dev/null \
+    || die "xz is required to extract the release archive.
+Install it first: apt install xz-utils | dnf install xz | pacman -S xz"
 
-tar -xJf "${TMPDIR}/${ARCHIVE}" -C "$TMPDIR"
-chmod +x "${TMPDIR}/devenv"
+  # ── Resolve release URL ─────────────────────────────────────────────────────
+  local base
+  if [ -n "${DEVENV_DOWNLOAD_URL:-}" ]; then
+    base="${DEVENV_DOWNLOAD_URL%/}"
+    echo -e "${BLUE}Installing devenv from ${base}...${NC}"
+  elif [ -n "${DEVENV_VERSION:-}" ]; then
+    base="https://github.com/${REPO}/releases/download/v${DEVENV_VERSION#v}"
+    echo -e "${BLUE}Installing devenv v${DEVENV_VERSION#v}...${NC}"
+  else
+    base="https://github.com/${REPO}/releases/latest/download"
+    echo -e "${BLUE}Installing the latest devenv release...${NC}"
+  fi
 
-# ── Run the installer ─────────────────────────────────────────────────────────
-echo -e "${GREEN}Launching devenv v${VERSION}...${NC}"
-exec "${TMPDIR}/devenv" "$@"
+  # ── Download, verify, and extract ───────────────────────────────────────────
+  local archive="${arch}.tar.xz" tmp status
+  DEVENV_TMP=$(mktemp -d)
+  trap 'rm -rf "$DEVENV_TMP"' EXIT
+  tmp="$DEVENV_TMP"
+
+  echo -e "${BLUE}Downloading ${archive}...${NC}"
+  download "${base}/${archive}" "${tmp}/${archive}" \
+    || die "Failed to download ${base}/${archive}"
+  download "${base}/SHA256SUMS" "${tmp}/SHA256SUMS" \
+    || die "Failed to download ${base}/SHA256SUMS; refusing to run an unverified binary."
+
+  (cd "$tmp" && grep " ${archive}\$" SHA256SUMS | sha256_check) \
+    || die "Checksum verification failed for ${archive}."
+  echo -e "${GREEN}Checksum verified.${NC}"
+
+  tar -xJf "${tmp}/${archive}" -C "$tmp"
+  chmod +x "${tmp}/devenv"
+
+  # ── Run the installer ───────────────────────────────────────────────────────
+  # Not exec'd, so the EXIT trap removes the temporary directory afterwards.
+  # Under `curl | bash`, stdin is the script pipe; hand the installer the
+  # terminal instead when one is available.
+  echo -e "${GREEN}Launching $("${tmp}/devenv" --version)...${NC}"
+  status=0
+  if [ ! -t 0 ] && (: </dev/tty) 2>/dev/null; then
+    "${tmp}/devenv" "$@" </dev/tty || status=$?
+  else
+    "${tmp}/devenv" "$@" || status=$?
+  fi
+  return "$status"
+}
+
+main "$@"
