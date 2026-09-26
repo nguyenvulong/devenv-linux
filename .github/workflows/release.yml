@@ -106,6 +106,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write
+      attestations: write
 
     steps:
       - uses: actions/checkout@v5
@@ -115,6 +117,20 @@ jobs:
         with:
           path: dist/
           merge-multiple: true
+
+      # install.sh refuses to run a binary without a matching checksum.
+      - name: Generate checksums
+        working-directory: dist
+        run: |
+          sha256sum x86_64.tar.xz aarch64.tar.xz > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: |
+            dist/x86_64.tar.xz
+            dist/aarch64.tar.xz
 
       - name: List assets
         run: ls -lh dist/
@@ -129,3 +145,4 @@ jobs:
           files: |
             dist/x86_64.tar.xz
             dist/aarch64.tar.xz
+            dist/SHA256SUMS
