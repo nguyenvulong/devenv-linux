@@ -14,30 +14,39 @@ sh "$devenv_script"
 
 pub fn install_mise<F>(mut log: F) -> Result<()>
 where
-    F: FnMut(&str) + Send + 'static,
+    F: FnMut(&str) + Send + 'static + Clone,
 {
     log("Checking for mise...");
     if is_installed() {
-        log("mise is already installed.");
+        let version = mise_version().unwrap_or_else(|_| "version unknown".to_string());
+        log(&format!("mise is already installed ({version})."));
         return Ok(());
     }
 
-    log("Installing mise...");
-    let result = run_cmd_streaming("sh", &["-c", MISE_BOOTSTRAP], log)?;
-    if result.success {
-        let output = Command::new(mise_bin())
-            .arg("--version")
-            .output()
-            .context("mise bootstrap completed but mise could not be executed")?;
-        if !output.status.success() {
-            return Err(anyhow!(
-                "mise bootstrap completed but mise verification failed"
-            ));
+    match std::env::var("MISE_VERSION") {
+        Ok(version) if !version.is_empty() => {
+            log(&format!("Installing mise {version} (from MISE_VERSION)..."))
         }
-        Ok(())
-    } else {
-        Err(anyhow!("Failed to install mise: {}", result.stderr.trim()))
+        _ => log("Installing the latest mise (set MISE_VERSION to pin)..."),
     }
+    let result = run_cmd_streaming("sh", &["-c", MISE_BOOTSTRAP], log.clone())?;
+    if !result.success {
+        return Err(anyhow!("Failed to install mise: {}", result.stderr.trim()));
+    }
+    let version = mise_version().context("mise bootstrap completed but verification failed")?;
+    log(&format!("Installed mise {version}."));
+    Ok(())
+}
+
+fn mise_version() -> Result<String> {
+    let output = Command::new(mise_bin())
+        .arg("--version")
+        .output()
+        .context("mise could not be executed")?;
+    if !output.status.success() {
+        return Err(anyhow!("mise --version failed"));
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
 pub fn is_installed() -> bool {
