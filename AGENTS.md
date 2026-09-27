@@ -24,7 +24,8 @@ devenv-linux/
 │   └── images/          # README screenshots (SVG)
 ├── .github/
 │   ├── scripts/
-│   │   └── verify-install.sh
+│   │   ├── verify-install.sh
+│   │   └── verify-shell-path.sh
 │   └── workflows/
 │       ├── test.yml
 │       └── release.yml
@@ -45,25 +46,27 @@ devenv-linux/
             ├── mod.rs
             ├── mise.rs
             ├── system.rs
-            └── config.rs
+            ├── config.rs
+            └── uninstall.rs
 ```
 
 ## Installer Flow
 
-1. `install.sh` detects architecture, checks for curl/wget, tar, and xz, downloads `<arch>.tar.xz` and `SHA256SUMS` from `/releases/latest/download/` (or the `DEVENV_VERSION` tag, or `DEVENV_DOWNLOAD_URL`), verifies the checksum, extracts, and runs `devenv` without `exec` so its temporary directory is cleaned up.
+1. `install.sh` detects architecture, checks for curl/wget, tar, and gzip (printing a distro-specific install command when missing), downloads `<arch>.tar.gz` (falling back to `<arch>.tar.xz`, which needs xz, for releases up to v1.1.1) and `SHA256SUMS` from `/releases/latest/download/` (or the `DEVENV_VERSION` tag, or `DEVENV_DOWNLOAD_URL`), verifies the checksum, extracts, and runs `devenv` without `exec` so its temporary directory is cleaned up.
 2. `main.rs` parses arguments strictly: `--help`/`-h` and `--version`/`-v` win; unknown, duplicate, or conflicting (`--all` with `--config`) arguments exit with status 2.
 3. `main.rs` enters full headless mode for `--all` or `INSTALLER_ALL=1`. `CI=true` never triggers an install.
-4. `main.rs` enters config-driven headless mode when `--config <path>`, `--config=<path>`, or `-c <path>` is set.
-5. Config-driven headless mode reads TOML from `headless_config.rs`, selects only enabled component IDs, and applies pinned versions only to `mise` tools.
-6. The TUI refuses to start without a terminal on stdout or when `CI=true`. It installs a panic hook that restores the terminal, draws a loading screen, then probes PATH tools, existing configs, and globally configured mise versions concurrently, and loads the searchable `mise` manifest.
-7. Every TUI component starts at Keep. Users explicitly choose Install or, for globally configured mise tools only, Deactivate.
-8. Enter opens a review containing only planned mutations, kept count, implicit prerequisites (mise, plus missing `curl`/`git` commands), and replacement warnings. A second Enter confirms execution.
-9. After review confirmation, `sudo -v` runs in the normal terminal only if planned system-package installations need it.
-10. `executor.rs` runs installation in 3 phases for both the TUI and headless modes and records each component outcome independently:
+4. `main.rs` runs uninstall for `--uninstall` (optionally `--purge`, `--yes`); these flags cannot be combined with `--all`/`--config`.
+5. `main.rs` enters config-driven headless mode when `--config <path>`, `--config=<path>`, or `-c <path>` is set.
+6. Config-driven headless mode reads TOML from `headless_config.rs`, selects only enabled component IDs, and applies pinned versions only to `mise` tools.
+7. The TUI refuses to start without a terminal on stdout or when `CI=true`. It installs a panic hook that restores the terminal, draws a loading screen, then probes PATH tools, existing configs, and globally configured mise versions concurrently, and loads the searchable `mise` manifest.
+8. Every TUI component starts at Keep. Users explicitly choose Install or, for globally configured mise tools only, Deactivate.
+9. Enter opens a review containing only planned mutations, kept count, implicit prerequisites (mise and missing system prerequisites), a warning when sudo is unavailable, and replacement warnings. A second Enter confirms execution.
+10. After review confirmation, `sudo -v` runs in the normal terminal only if planned system packages (selected Build Tools or missing prerequisites) need it and the user is not root.
+11. `executor.rs` runs installation in 3 phases for both the TUI and headless modes and records each component outcome independently:
    - system packages
    - mise tools
    - configurations
-11. The TUI event loop always polls input with a timeout (never busy-waits). After installation the log stays visible until Enter opens the summary.
+12. The TUI event loop always polls input with a timeout (never busy-waits). After installation the log stays visible until Enter opens the summary, which ends with "Next steps" (also printed by headless modes).
 
 ## Current Product Direction
 
@@ -72,7 +75,7 @@ devenv-linux/
 - No `tmux` or `nushell`
 - Search uses embedded `mise_registry.toml`, with runtime `mise registry` fallback when available
 - Config-driven headless installs use TOML component IDs from `devenv.example.toml`; mise tool versions default to `latest`
-- Release assets are named by architecture only (`x86_64.tar.xz`, `aarch64.tar.xz`) so `/releases/latest/download/...` URLs stay stable across versions. Every release also publishes `SHA256SUMS` and build provenance attestations; `install.sh` refuses to run an unverified archive.
+- Release assets are named by architecture only (`x86_64.tar.gz`, `aarch64.tar.gz`, plus the same binaries as `.tar.xz` for older links) so `/releases/latest/download/...` URLs stay stable across versions. Every release also publishes `SHA256SUMS` and build provenance attestations; `install.sh` refuses to run an unverified archive.
 
 ## Key Implementation Notes
 
@@ -80,16 +83,21 @@ devenv-linux/
 - Opening the TUI and pressing Enter without changing the default Keep actions must perform no writes.
 - TUI actions are Keep, Install, and Deactivate. Space toggles Keep/Install and returns Deactivate to Keep; there is no bulk-deactivate action.
 - Deactivate is available only when `mise ls --global --json <tool>` proves global ownership. Remove every requested global version with `mise unuse --global --no-prune <tool@version>`.
-- PATH-only and locally configured tools cannot be deactivated. System packages and configurations have no removal behavior.
+- PATH-only and locally configured tools cannot be deactivated. System packages and configurations have no per-component removal; the separate uninstall flow removes devenv's shell changes (and mise with `--purge`).
+- System prerequisites are implicit, never components: `InstallPlan::for_environment` adds the ones the plan needs and the machine lacks (curl + CA certificates to bootstrap mise when missing; git + a C compiler for LazyVim; a C compiler for Rust; libatomic for Node.js). Phase 1 installs them with the package manager together with the optional Build Tools (`base-deps`). `InstallPlan::from_components` stays pure for tests.
+- Without root or sudo, the review warns up front and the system phase fails with a clear message instead of crashing.
 - Mise installation is lazy. It is an implicit prerequisite only for selected mise-tool installs and Bash/Fish configuration.
 - Headless installs record and print per-component outcomes, continue independent work after failures, and exit nonzero if any component fails.
 - Arch package installation uses existing databases with `pacman -S --needed`; users must complete a full system upgrade separately when databases/packages are stale. Never run a standalone `pacman -Sy`.
 - Root installations call package managers directly and do not require sudo.
 - Distro detection parses quoted ID values and whitespace-separated ID_LIKE tokens, including rhel.
-- Mise bootstrap downloads successfully to a temporary file before execution and verifies the resulting executable. It requires `curl` and fails early with a clear message when it is missing; LazyVim similarly requires `git`.
+- Mise bootstrap downloads successfully to a temporary file before execution, is retried up to 3 times on failure, and verifies the resulting executable. It requires `curl` and fails early with a clear message when it is missing; LazyVim similarly requires `git`.
 - Log the mise version (honoring `MISE_VERSION`) and the LazyVim starter commit for reproducibility.
 - Command detection requires the executable bit and checks the mise shims directory resolved from `MISE_DATA_DIR`, then `$XDG_DATA_HOME/mise`, then `~/.local/share/mise`. Root detection uses `geteuid()`.
-- Shell activation resolves mise on PATH with a ~/.local/bin fallback. Fish uses interactive activation and noninteractive --shims; Bash hooks run only interactively.
+- Shell setup is implicit whenever a plan installs mise tools (or selects Bash/Fish configuration) and mise is ready: `~/.bashrc` gets interactive activation, the login profile (`~/.bash_profile`, `~/.bash_login`, or `~/.profile`, whichever bash reads) gets `~/.local/bin` plus the mise shims directory, and fish users get `~/.config/fish/conf.d/devenv-mise.fish` unless `config.fish` already activates mise. "Bash Configuration" is this same setup, selectable on its own. If shell setup fails, the mise tools installed in that run are reported as failed.
+- Every block devenv adds to a user file sits between `# >>> devenv-linux >>>` and `# <<< devenv-linux <<<` with a comment explaining it; keep this so blocks can be detected and removed.
+- "Fish Configuration" writes defaults to `config.fish` only when it does not exist; activation lives in the conf.d file. Never change the user's login shell.
+- Shell activation resolves mise on PATH with a ~/.local/bin fallback and is skipped when mise is missing. Fish uses interactive activation and noninteractive --shims; Bash hooks run only interactively.
 - Explicit shell configuration installs migrate exact legacy installer activation lines with numbered backups, ignore commented activation when detecting setup, and preserve custom activation blocks.
 - Config installs should be non-destructive and back up existing user files when overwriting. Shell config writes are atomic (temporary sibling + rename), preserve permissions, and follow symlinks so dotfile-manager links stay intact.
 - Default Fish config uses `fish_add_path --append` and defines colors, aliases, and the history wrapper only in interactive shells.
@@ -101,6 +109,7 @@ devenv-linux/
 - Install logs are shared through `Arc<Mutex<Vec<String>>>`.
 - Install progress uses atomics: `install_done: AtomicBool` and `install_index: AtomicUsize`.
 - Reports must use recorded per-component outcomes: Succeeded, Failed, Already configured, Deactivated, or Kept.
+- Uninstall (`installer/uninstall.rs`, CLI `--uninstall` and TUI key `x`) always shows its plan before acting and backs up every edited file. By default it removes only devenv's shell changes: marked blocks, the fish conf.d file, unmarked activation from releases up to v1.1.1, and a `config.fish` that still equals a devenv default. `--purge` also deletes `~/.local/bin/mise` and mise's data, config, cache, and state directories (honoring `MISE_*_DIR` and XDG variables; symlinks are removed, never followed). Never touch `~/.config/nvim` or `nvim.bak*` (remind the user instead) or system packages. Without a terminal it requires `--yes`.
 - Keep installer code simple and explicit; prefer fallible helpers over panics. Installer-thread panics are caught and reported.
 
 ## Documentation
@@ -126,7 +135,8 @@ cargo test --locked
 shellcheck ../install.sh ../.github/scripts/*.sh
 ```
 
-CI (`test.yml`) runs a `lint` job with the commands above plus an end-to-end `install.sh` checksum test, then the per-distro `--all` install matrix, which verifies results with `.github/scripts/verify-install.sh`.
+CI (`test.yml`) runs a `lint` job with the commands above plus an end-to-end `install.sh` checksum test, then a `bare` job on plain Debian and Fedora images with only curl installed (checks automatic prerequisites and PATH for root and a `su` user via `.github/scripts/verify-shell-path.sh`), and the per-distro `--all` install matrix, which verifies results with `.github/scripts/verify-install.sh`.
+Scripts under `.github/scripts/` start with a header comment: purpose, usage, and what they check.
 
 ## Branches
 

@@ -52,6 +52,7 @@ fn main() -> ExitCode {
         }
         Mode::All => run_headless(),
         Mode::Config(path) => run_headless_config(path),
+        Mode::Uninstall { purge, yes } => run_uninstall(purge, yes),
         Mode::Interactive => run_interactive(),
     };
 
@@ -70,6 +71,7 @@ enum Mode {
     Version,
     All,
     Config(PathBuf),
+    Uninstall { purge: bool, yes: bool },
     Interactive,
 }
 
@@ -85,13 +87,22 @@ fn parse_args(args: &[String], installer_all: bool) -> Result<Mode, String> {
     }
 
     let mut all = false;
+    let (mut uninstall, mut purge, mut yes) = (false, false, false);
     let mut config: Option<PathBuf> = None;
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
-        let path = if arg == "--all" {
-            all = true;
+        let flag = match arg.as_str() {
+            "--all" => Some(&mut all),
+            "--uninstall" => Some(&mut uninstall),
+            "--purge" => Some(&mut purge),
+            "--yes" | "-y" => Some(&mut yes),
+            _ => None,
+        };
+        if let Some(flag) = flag {
+            *flag = true;
             continue;
-        } else if arg == "--config" || arg == "-c" {
+        }
+        let path = if arg == "--config" || arg == "-c" {
             iter.next()
                 .map(String::as_str)
                 .ok_or_else(|| format!("{arg} requires a path"))?
@@ -107,6 +118,16 @@ fn parse_args(args: &[String], installer_all: bool) -> Result<Mode, String> {
         if config.replace(PathBuf::from(path)).is_some() {
             return Err("--config may only be given once".to_string());
         }
+    }
+
+    if uninstall {
+        if all || config.is_some() {
+            return Err("--uninstall cannot be combined with --all or --config".to_string());
+        }
+        return Ok(Mode::Uninstall { purge, yes });
+    }
+    if purge || yes {
+        return Err("--purge and --yes are only valid with --uninstall".to_string());
     }
 
     match (all, config) {
@@ -129,6 +150,9 @@ Usage:
 Options:
       --all              Install every built-in component
   -c, --config <PATH>    Install enabled components from a TOML config
+      --uninstall        Remove devenv's shell changes (mise and tools stay)
+      --purge            With --uninstall: also remove mise and every tool it installed
+  -y, --yes              With --uninstall: do not ask for confirmation
   -h, --help             Print help
   -v, --version          Print version
 
@@ -193,6 +217,53 @@ fn install_panic_hook() {
     }));
 }
 
+/// Show what an uninstall will change, confirm, and carry it out.
+fn run_uninstall(purge: bool, yes: bool) -> Result<(), Box<dyn Error>> {
+    let plan = installer::uninstall::plan(purge)?;
+    println!(
+        "==> devenv-linux uninstall{}",
+        if purge { " (purge)" } else { "" }
+    );
+    if plan.is_empty() {
+        println!("\nNothing to uninstall: no devenv changes were found.");
+    } else {
+        println!("\nThis will:");
+        for action in &plan.actions {
+            println!("  - {}", action.describe());
+        }
+    }
+    println!("\nLeft in place:");
+    for note in &plan.notes {
+        println!("  - {note}");
+    }
+    if plan.is_empty() {
+        return Ok(());
+    }
+
+    if !yes {
+        if !io::stdin().is_terminal() {
+            return Err("no terminal to confirm on; re-run with --yes".into());
+        }
+        print!("\nProceed? [y/N] ");
+        io::stdout().flush()?;
+        let mut answer = String::new();
+        io::stdin().read_line(&mut answer)?;
+        if !matches!(answer.trim().to_lowercase().as_str(), "y" | "yes") {
+            println!("Aborted; nothing was changed.");
+            return Ok(());
+        }
+    }
+
+    println!();
+    let results = installer::uninstall::execute(&plan, |msg| println!("{msg}"));
+    let failures = results.iter().filter(|(_, result)| result.is_err()).count();
+    if failures > 0 {
+        return Err(format!("{failures} uninstall step(s) failed").into());
+    }
+    println!("\n✅ Uninstalled. Open a new terminal for the changes to take effect.");
+    Ok(())
+}
+
 fn run_headless() -> Result<(), Box<dyn Error>> {
     let mut components = registry::get_all_components();
     for c in &mut components {
@@ -214,8 +285,12 @@ fn run_headless_components(components: Vec<Component>, mode: &str) -> Result<(),
     println!("==> devenv-linux headless installer ({mode})");
     println!();
 
-    let install_plan = InstallPlan::from_components(&components);
-    if install_plan.needs_sudo() && !sys::is_root() {
+    let install_plan = InstallPlan::for_environment(&components);
+    if install_plan.needs_sudo() && !installer::system::can_install_packages() {
+        println!(
+            "Warning: sudo is not installed; system packages will fail. Run as root or install sudo."
+        );
+    } else if install_plan.needs_sudo() && !sys::is_root() {
         println!("Some components require elevated privileges (sudo).");
         let status = Command::new("sudo")
             .arg("-v")
@@ -245,6 +320,13 @@ fn run_headless_components(components: Vec<Component>, mode: &str) -> Result<(),
     for component in &components {
         if let Some(outcome) = outcomes.get(&component.id) {
             println!("{}: {}", component.id, outcome_label(outcome));
+        }
+    }
+    let steps = executor::next_steps(&install_plan);
+    if !steps.is_empty() {
+        println!("\nNext steps:");
+        for step in steps {
+            println!("  - {step}");
         }
     }
     let failures = outcomes
@@ -301,6 +383,7 @@ where
                 KeyCode::Char('q') | KeyCode::Esc => app.should_quit = true,
                 KeyCode::Up | KeyCode::Char('k') => app.previous(),
                 KeyCode::Down | KeyCode::Char('j') => app.next(),
+                KeyCode::Char('x') => app.open_uninstall(false),
                 KeyCode::Char('/') => {
                     app.search_query.clear();
                     app.update_search();
@@ -320,7 +403,7 @@ where
             Screen::Review => match key.code {
                 KeyCode::Esc => app.screen = Screen::Selection,
                 KeyCode::Enter => {
-                    let plan = InstallPlan::from_components(&app.components);
+                    let plan = InstallPlan::for_environment(&app.components);
                     if plan.needs_sudo() && !ensure_sudo_credentials_for_install()? {
                         continue;
                     }
@@ -354,7 +437,13 @@ where
                 }
                 _ => {}
             },
-            Screen::Report => match key.code {
+            Screen::Uninstall => match key.code {
+                KeyCode::Esc => app.screen = Screen::Selection,
+                KeyCode::Char('p') => app.toggle_uninstall_purge(),
+                KeyCode::Enter => app.run_uninstall(),
+                _ => {}
+            },
+            Screen::UninstallDone | Screen::Report => match key.code {
                 KeyCode::Char('q') | KeyCode::Esc | KeyCode::Enter => app.should_quit = true,
                 _ => {}
             },
@@ -376,7 +465,8 @@ fn handle_selection_action_key(app: &mut App, key: KeyCode) -> bool {
 }
 
 fn ensure_sudo_credentials_for_install() -> Result<bool, Box<dyn Error>> {
-    if sys::is_root() {
+    // Without sudo the system phase fails with a clear error (shown in review).
+    if sys::is_root() || !installer::system::can_install_packages() {
         return Ok(true);
     }
     if has_cached_sudo_credentials()? {
@@ -450,7 +540,7 @@ fn spawn_installation(app: &mut App) {
     let done_flag = Arc::clone(&app.install_done);
     let install_index = Arc::clone(&app.install_index);
     let outcomes = Arc::clone(&app.outcomes);
-    let install_plan = InstallPlan::from_components(&app.components);
+    let install_plan = InstallPlan::for_environment(&app.components);
 
     thread::spawn(move || {
         let log = {
@@ -584,6 +674,8 @@ mod tests {
             search_query: String::new(),
             search_results: Vec::new(),
             search_cursor: 0,
+            uninstall_plan: None,
+            uninstall_results: Vec::new(),
         }
     }
 
@@ -764,6 +856,27 @@ mod tests {
             parse_args(&args(&["-c", "a.toml"]), true),
             Ok(Mode::Config(PathBuf::from("a.toml")))
         );
+    }
+
+    #[test]
+    fn parse_args_should_parse_uninstall_flags() {
+        assert_eq!(
+            parse_args(&args(&["--uninstall"]), false),
+            Ok(Mode::Uninstall {
+                purge: false,
+                yes: false
+            })
+        );
+        assert_eq!(
+            parse_args(&args(&["--uninstall", "--purge", "-y"]), true),
+            Ok(Mode::Uninstall {
+                purge: true,
+                yes: true
+            })
+        );
+        for values in [&["--purge"][..], &["--yes"], &["--uninstall", "--all"]] {
+            assert!(parse_args(&args(values), false).is_err(), "{values:?}");
+        }
     }
 
     #[test]

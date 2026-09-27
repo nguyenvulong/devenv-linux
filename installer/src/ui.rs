@@ -17,6 +17,8 @@ pub fn draw(f: &mut Frame, app: &mut App) {
         Screen::Installing => draw_installing(f, app),
         Screen::Report => draw_report(f, app),
         Screen::Search => draw_search(f, app),
+        Screen::Uninstall => draw_uninstall(f, app),
+        Screen::UninstallDone => draw_uninstall_done(f, app),
     }
 }
 
@@ -209,6 +211,8 @@ fn draw_selection(f: &mut Frame, app: &mut App) {
             Span::raw("/   "),
             Span::styled(" Review ", theme::success_text_style()),
             Span::raw("<Enter>   "),
+            Span::styled(" Uninstall ", theme::selection_uninstall_style()),
+            Span::raw("x   "),
             Span::styled(" Quit ", theme::shortcut_action_style(theme::COLOR_ERROR)),
             Span::raw("q"),
         ]),
@@ -222,7 +226,7 @@ fn draw_selection(f: &mut Frame, app: &mut App) {
 }
 
 fn draw_review(f: &mut Frame, app: &App) {
-    let plan = InstallPlan::from_components(&app.components);
+    let plan = InstallPlan::for_environment(&app.components);
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -287,29 +291,23 @@ fn draw_review(f: &mut Frame, app: &App) {
             Span::raw("mise will be installed if it is missing."),
         ]));
     }
-    for (command, reason) in plan.required_commands() {
-        if (command == "curl" && crate::installer::mise::is_installed())
-            || crate::sys::check_command_exists(command)
-        {
-            continue;
-        }
-        if plan.installs_base_deps() {
-            notes.push(Line::from(vec![
-                Span::styled("Prerequisite: ", theme::shortcut_key_style()),
-                Span::raw(format!(
-                    "{command} for {reason} will be installed by Base Dependencies."
-                )),
-            ]));
-        } else {
-            notes.push(Line::from(Span::styled(
-                format!(
-                    "Missing: {command} is required for {reason}; select Base Dependencies or install it."
-                ),
-                Style::default().fg(theme::COLOR_WARNING),
-            )));
-        }
+    if !plan.prerequisites.is_empty() {
+        let names: Vec<&str> = plan.prerequisites.iter().map(|(p, _)| p.label()).collect();
+        notes.push(Line::from(vec![
+            Span::styled("System prerequisites: ", theme::shortcut_key_style()),
+            Span::raw(format!("{} will be installed.", names.join(", "))),
+        ]));
     }
-    if plan.needs_sudo() {
+    if plan.needs_sudo() && !crate::installer::system::can_install_packages() {
+        notes.push(Line::from(Span::styled(
+            "Warning: sudo is not installed. System packages will fail; run devenv as root or install sudo.",
+            Style::default().fg(theme::COLOR_WARNING),
+        )));
+    }
+    if plan.needs_sudo()
+        && !crate::sys::is_root()
+        && crate::installer::system::can_install_packages()
+    {
         notes.push(Line::from(vec![
             Span::styled("Privilege: ", theme::shortcut_key_style()),
             Span::raw("sudo authentication follows confirmation."),
@@ -404,12 +402,13 @@ fn draw_installing(f: &mut Frame, app: &mut App) {
 }
 
 fn draw_report(f: &mut Frame, app: &mut App) {
+    let steps = crate::executor::next_steps(&InstallPlan::from_components(&app.components));
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3),
             Constraint::Min(10),
-            Constraint::Length(3),
+            Constraint::Length(steps.len() as u16 + 3),
         ])
         .split(f.area());
 
@@ -497,9 +496,20 @@ fn draw_report(f: &mut Frame, app: &mut App) {
 
     f.render_widget(table, chunks[1]);
 
-    let footer = Paragraph::new(" Press 'q' or <Enter> to exit ")
-        .style(Style::default().fg(theme::COLOR_MUTED))
-        .block(theme::default_block());
+    let mut footer_lines: Vec<Line> = steps
+        .iter()
+        .map(|step| {
+            Line::from(vec![
+                Span::styled(" → ", theme::success_text_style()),
+                Span::raw(step.clone()),
+            ])
+        })
+        .collect();
+    footer_lines.push(Line::from(Span::styled(
+        " Press 'q' or <Enter> to exit",
+        Style::default().fg(theme::COLOR_MUTED),
+    )));
+    let footer = Paragraph::new(footer_lines).block(theme::default_block().title(" Next steps "));
     f.render_widget(footer, chunks[2]);
 }
 
@@ -577,4 +587,137 @@ fn draw_search(f: &mut Frame, app: &mut App) {
     ]))
     .block(theme::default_block());
     f.render_widget(help, chunks[3]);
+}
+
+fn draw_uninstall(f: &mut Frame, app: &App) {
+    let Some(plan) = &app.uninstall_plan else {
+        return;
+    };
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Min(6),
+            Constraint::Length(plan.notes.len() as u16 + 2),
+            Constraint::Length(3),
+        ])
+        .split(f.area());
+
+    let title = if plan.purge {
+        " Uninstall devenv-linux changes: PURGE (also removes mise and all its tools) "
+    } else {
+        " Uninstall devenv-linux changes "
+    };
+    f.render_widget(
+        Paragraph::new(title)
+            .style(if plan.purge {
+                theme::selection_uninstall_style()
+            } else {
+                theme::title_style()
+            })
+            .block(theme::default_block()),
+        chunks[0],
+    );
+
+    let actions: Vec<Line> = if plan.is_empty() {
+        vec![Line::from(
+            " Nothing to uninstall: no devenv changes were found.",
+        )]
+    } else {
+        plan.actions
+            .iter()
+            .map(|action| {
+                Line::from(vec![
+                    Span::styled(" - ", theme::selection_uninstall_style()),
+                    Span::raw(action.describe()),
+                ])
+            })
+            .collect()
+    };
+    f.render_widget(
+        Paragraph::new(actions).block(theme::default_block().title(" This will ")),
+        chunks[1],
+    );
+
+    let notes: Vec<Line> = plan
+        .notes
+        .iter()
+        .map(|note| Line::from(format!(" {note}")))
+        .collect();
+    f.render_widget(
+        Paragraph::new(notes).block(theme::default_block().title(" Left in place ")),
+        chunks[2],
+    );
+
+    let purge_state = if plan.purge { "on" } else { "off" };
+    f.render_widget(
+        Paragraph::new(format!(
+            " <Enter> Uninstall    <p> Purge: {purge_state}    <Esc> Back "
+        ))
+        .block(theme::default_block()),
+        chunks[3],
+    );
+}
+
+fn draw_uninstall_done(f: &mut Frame, app: &App) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Min(6),
+            Constraint::Length(4),
+        ])
+        .split(f.area());
+
+    let failed = app
+        .uninstall_results
+        .iter()
+        .filter(|(_, result)| result.is_err())
+        .count();
+    let (header, style) = if failed == 0 {
+        (
+            " Uninstall complete ".to_string(),
+            theme::success_text_style(),
+        )
+    } else {
+        (
+            format!(" Uninstall finished with {failed} failure(s) "),
+            theme::selection_uninstall_style(),
+        )
+    };
+    f.render_widget(
+        Paragraph::new(Span::styled(header, style)).block(theme::default_block()),
+        chunks[0],
+    );
+
+    let lines: Vec<Line> = app
+        .uninstall_results
+        .iter()
+        .map(|(description, result)| match result {
+            Ok(()) => Line::from(vec![
+                Span::styled(" ✓ ", theme::success_text_style()),
+                Span::raw(description.clone()),
+            ]),
+            Err(error) => Line::from(Span::styled(
+                format!(" ✗ {description}: {error}"),
+                Style::default().fg(theme::COLOR_ERROR),
+            )),
+        })
+        .collect();
+    f.render_widget(
+        Paragraph::new(lines).block(theme::default_block().title(" Results ")),
+        chunks[1],
+    );
+
+    f.render_widget(
+        Paragraph::new(vec![
+            Line::from(" → Open a new terminal for the changes to take effect."),
+            Line::from(Span::styled(
+                " Press 'q' or <Enter> to exit",
+                Style::default().fg(theme::COLOR_MUTED),
+            )),
+        ])
+        .block(theme::default_block().title(" Next steps ")),
+        chunks[2],
+    );
 }

@@ -1,10 +1,21 @@
 #!/usr/bin/env bash
-# install.sh — thin bootstrap that downloads, verifies, and runs a devenv release.
-# Source: https://github.com/nguyenvulong/devenv-linux
+# install.sh -- bootstrap for devenv-linux.
+#
+# Downloads the devenv release binary for this machine's architecture,
+# verifies it against the release's SHA256SUMS, and runs it. Any arguments
+# are passed to devenv (e.g. `bash -s -- --all`).
+#
+# Requirements (checked up front, with a distro-specific install hint):
+#   - curl or wget (and CA certificates) to download the release
+#   - tar and gzip to unpack it, sha256sum (or shasum) to verify it
+# All but curl/wget ship with every supported base image. Releases up to
+# v1.1.1 only published .tar.xz; for those, xz is also needed.
 #
 # Environment:
-#   DEVENV_VERSION        Release tag to install (e.g. v1.1.0). Defaults to the latest release.
-#   DEVENV_DOWNLOAD_URL   Base URL holding <arch>.tar.xz and SHA256SUMS (mirrors/testing).
+#   DEVENV_VERSION        Release tag to install (e.g. v1.2.0). Defaults to the latest release.
+#   DEVENV_DOWNLOAD_URL   Base URL holding <arch>.tar.gz and SHA256SUMS (mirrors/testing).
+#
+# Source: https://github.com/nguyenvulong/devenv-linux
 
 set -euo pipefail
 
@@ -27,6 +38,23 @@ download() {
   else
     wget -q --tries=3 -O "$dest" "$url"
   fi
+}
+
+# Print the command that installs the given packages on this distro.
+install_hint() {
+  local id="" like=""
+  if [ -r /etc/os-release ]; then
+    # shellcheck source=/dev/null
+    id=$(. /etc/os-release && echo "${ID:-}")
+    # shellcheck source=/dev/null
+    like=$(. /etc/os-release && echo "${ID_LIKE:-}")
+  fi
+  case " $id $like " in
+    *" debian "* | *" ubuntu "*) echo "apt-get update && apt-get install -y $*" ;;
+    *" fedora "* | *" rhel "* | *" centos "*) echo "dnf install -y ${*//xz-utils/xz}" ;;
+    *" arch "*) echo "pacman -S --needed ${*//xz-utils/xz}" ;;
+    *) echo "install: $*" ;;
+  esac
 }
 
 sha256_check() {
@@ -55,11 +83,14 @@ Pre-built binaries are available for x86_64 and aarch64 only."
 
   # ── Check required tools ────────────────────────────────────────────────────
   command -v curl &>/dev/null || command -v wget &>/dev/null \
-    || die "Neither curl nor wget found. Install one and try again."
-  command -v tar &>/dev/null || die "tar is required. Install it and try again."
-  command -v xz &>/dev/null \
-    || die "xz is required to extract the release archive.
-Install it first: apt install xz-utils | dnf install xz | pacman -S xz"
+    || die "Neither curl nor wget found. Install one first (as root):
+  $(install_hint curl ca-certificates)"
+  local tool
+  for tool in tar gzip; do
+    command -v "$tool" &>/dev/null \
+      || die "$tool is required to unpack the release. Install it first (as root):
+  $(install_hint "$tool")"
+  done
 
   # ── Resolve release URL ─────────────────────────────────────────────────────
   local base
@@ -75,14 +106,23 @@ Install it first: apt install xz-utils | dnf install xz | pacman -S xz"
   fi
 
   # ── Download, verify, and extract ───────────────────────────────────────────
-  local archive="${arch}.tar.xz" tmp status
+  local archive tmp status
   DEVENV_TMP=$(mktemp -d)
   trap 'rm -rf "$DEVENV_TMP"' EXIT
   tmp="$DEVENV_TMP"
 
+  # Prefer .tar.gz (no xz needed); releases up to v1.1.1 only have .tar.xz.
+  archive="${arch}.tar.gz"
   echo -e "${BLUE}Downloading ${archive}...${NC}"
-  download "${base}/${archive}" "${tmp}/${archive}" \
-    || die "Failed to download ${base}/${archive}"
+  if ! download "${base}/${archive}" "${tmp}/${archive}" 2>/dev/null; then
+    archive="${arch}.tar.xz"
+    command -v xz &>/dev/null \
+      || die "This release only provides ${archive}, which needs xz. Install it first (as root):
+  $(install_hint xz-utils)"
+    echo -e "${BLUE}Falling back to ${archive}...${NC}"
+    download "${base}/${archive}" "${tmp}/${archive}" \
+      || die "Failed to download ${base}/${archive}"
+  fi
   download "${base}/SHA256SUMS" "${tmp}/SHA256SUMS" \
     || die "Failed to download ${base}/SHA256SUMS; refusing to run an unverified binary."
 
@@ -90,7 +130,7 @@ Install it first: apt install xz-utils | dnf install xz | pacman -S xz"
     || die "Checksum verification failed for ${archive}."
   echo -e "${GREEN}Checksum verified.${NC}"
 
-  tar -xJf "${tmp}/${archive}" -C "$tmp"
+  tar -xf "${tmp}/${archive}" -C "$tmp"
   chmod +x "${tmp}/devenv"
 
   # ── Run the installer ───────────────────────────────────────────────────────

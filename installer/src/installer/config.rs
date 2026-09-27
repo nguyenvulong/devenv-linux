@@ -23,16 +23,8 @@ where
     F: FnMut(&str) + Send + 'static + Clone,
 {
     match component.id.as_str() {
-        "config-bash" => {
-            update_shell_config(&home.join(".bashrc"), "bash", BASH_ACTIVATION, "", log)
-        }
-        "config-fish" => update_shell_config(
-            &home.join(".config/fish/config.fish"),
-            "fish",
-            FISH_ACTIVATION,
-            FISH_DEFAULTS,
-            log,
-        ),
+        "config-bash" => setup_shell_path_in_home(home, false, log),
+        "config-fish" => setup_fish_config(home, log),
         "config-nvim" => {
             let nvim_dir = home.join(".config/nvim");
             let staging_dir = next_staging_path(&nvim_dir)?;
@@ -119,7 +111,7 @@ vim.g.clipboard = {
     }
 }
 
-const FISH_DEFAULTS: &str = r#"
+pub(crate) const FISH_DEFAULTS: &str = r#"
 # path
 fish_add_path --append ~/.local/bin ~/.local/share/mise/shims
 
@@ -145,25 +137,61 @@ end
 
 "#;
 
-const BASH_ACTIVATION: &str = r#"# mise activation -- added by devenv-linux installer
+/// Every block devenv adds to a user file sits between these markers, so it
+/// can be found again (to skip re-adding it, or to remove it on uninstall).
+pub(crate) const BLOCK_BEGIN: &str = "# >>> devenv-linux >>>";
+pub(crate) const BLOCK_END: &str = "# <<< devenv-linux <<<";
+
+/// Appended to ~/.bashrc: interactive bash activates mise.
+const BASH_ACTIVATION: &str = r#"# >>> devenv-linux >>>
+# Added by devenv-linux: activates mise in interactive bash so mise and the
+# tools it manages are on PATH. Remove this block to undo.
 if ! command -v mise >/dev/null 2>&1; then
     export PATH="$HOME/.local/bin:$PATH"
 fi
 case $- in
-    *i*) eval "$(mise activate bash)" ;;
+    *i*) command -v mise >/dev/null 2>&1 && eval "$(mise activate bash)" ;;
 esac
+# <<< devenv-linux <<<
 "#;
 
-const FISH_ACTIVATION: &str = r#"# mise activation -- added by devenv-linux installer
+/// Appended to the login profile: login shells, scripts, and SSH commands get
+/// mise and the shims of its tools on PATH without an interactive hook.
+const PROFILE_PATH: &str = r#"# >>> devenv-linux >>>
+# Added by devenv-linux: puts mise and the shims of the tools it manages on
+# PATH for login shells, scripts, and SSH commands. Interactive bash also
+# activates mise from ~/.bashrc. Remove this block to undo.
+devenv_shims="${MISE_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/mise}/shims"
+for devenv_dir in "$devenv_shims" "$HOME/.local/bin"; do
+    case ":$PATH:" in
+        *":$devenv_dir:"*) ;;
+        *) PATH="$devenv_dir:$PATH" ;;
+    esac
+done
+export PATH
+unset devenv_dir devenv_shims
+# <<< devenv-linux <<<
+"#;
+
+/// Written to ~/.config/fish/conf.d/devenv-mise.fish, which fish loads on
+/// start, so fish sees mise tools without touching config.fish.
+const FISH_ACTIVATION: &str = r#"# >>> devenv-linux >>>
+# Added by devenv-linux: activates mise in fish so mise and the tools it
+# manages are on PATH. Delete this file to undo.
 if not type -q mise
     set -gx PATH "$HOME/.local/bin" $PATH
 end
-if status is-interactive
-    mise activate fish | source
-else
-    mise activate fish --shims | source
+if type -q mise
+    if status is-interactive
+        mise activate fish | source
+    else
+        mise activate fish --shims | source
+    end
 end
+# <<< devenv-linux <<<
 "#;
+
+pub(crate) const FISH_ACTIVATION_FILE: &str = ".config/fish/conf.d/devenv-mise.fish";
 
 pub(crate) fn has_shell_activation(contents: &str, shell: &str) -> bool {
     contents.lines().any(|line| {
@@ -171,6 +199,154 @@ pub(crate) fn has_shell_activation(contents: &str, shell: &str) -> bool {
         !line.starts_with('#') && line.contains(&format!("mise activate {shell}"))
     })
 }
+
+fn has_block(contents: &str) -> bool {
+    contents.lines().any(|line| line.trim() == BLOCK_BEGIN)
+}
+
+/// The file bash reads for login shells: the first of ~/.bash_profile,
+/// ~/.bash_login, and ~/.profile that exists, or ~/.profile.
+pub(crate) fn login_profile(home: &Path) -> PathBuf {
+    [".bash_profile", ".bash_login"]
+        .iter()
+        .map(|name| home.join(name))
+        .find(|path| path.exists())
+        .unwrap_or_else(|| home.join(".profile"))
+}
+
+/// Make mise and its tools reachable from the user's shells: activation in
+/// ~/.bashrc, a PATH block in the login profile, and (for fish users) a
+/// conf.d activation file. Every step is idempotent.
+pub fn setup_shell_path<F>(fish: bool, log: F) -> Result<ConfigOutcome>
+where
+    F: FnMut(&str) + Send + 'static + Clone,
+{
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
+    setup_shell_path_in_home(Path::new(&home), fish, log)
+}
+
+fn setup_shell_path_in_home<F>(home: &Path, fish: bool, log: F) -> Result<ConfigOutcome>
+where
+    F: FnMut(&str) + Send + 'static + Clone,
+{
+    let mut outcomes = vec![
+        update_shell_config(
+            &home.join(".bashrc"),
+            "bash",
+            BASH_ACTIVATION,
+            "",
+            log.clone(),
+        )?,
+        append_block(&login_profile(home), PROFILE_PATH, log.clone())?,
+    ];
+    if fish {
+        outcomes.push(ensure_fish_activation(home, log)?);
+    }
+    Ok(combine(&outcomes))
+}
+
+/// Fish defaults (aliases, colors) go to config.fish only when it does not
+/// exist yet; activation lives in conf.d. Legacy installer lines are migrated.
+fn setup_fish_config<F>(home: &Path, mut log: F) -> Result<ConfigOutcome>
+where
+    F: FnMut(&str) + Send + 'static + Clone,
+{
+    let config = home.join(".config/fish/config.fish");
+    let mut outcomes = Vec::new();
+    match fs::read_to_string(&config) {
+        Ok(contents) => {
+            if contents.lines().any(|line| line == LEGACY_FISH_ACTIVATION) {
+                outcomes.push(update_shell_config(
+                    &config,
+                    "fish",
+                    FISH_ACTIVATION,
+                    "",
+                    log.clone(),
+                )?);
+            }
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            if let Some(parent) = config.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            write_atomically(&config, FISH_DEFAULTS)?;
+            log(&format!(
+                "Wrote default fish configuration to {}",
+                config.display()
+            ));
+            outcomes.push(ConfigOutcome::Changed);
+        }
+        Err(error) => {
+            return Err(error).with_context(|| format!("Failed to read {}", config.display()));
+        }
+    }
+    outcomes.push(ensure_fish_activation(home, log)?);
+    Ok(combine(&outcomes))
+}
+
+fn ensure_fish_activation<F>(home: &Path, mut log: F) -> Result<ConfigOutcome>
+where
+    F: FnMut(&str),
+{
+    let config = fs::read_to_string(home.join(".config/fish/config.fish")).unwrap_or_default();
+    let file = home.join(FISH_ACTIVATION_FILE);
+    if has_shell_activation(&config, "fish") || file.exists() {
+        return Ok(ConfigOutcome::AlreadyConfigured);
+    }
+    if let Some(parent) = file.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    write_atomically(&file, FISH_ACTIVATION)?;
+    log(&format!("Wrote fish mise activation to {}", file.display()));
+    Ok(ConfigOutcome::Changed)
+}
+
+/// Append a marked block to a file unless one is already there, backing the
+/// file up first.
+fn append_block<F>(destination: &Path, block: &str, mut log: F) -> Result<ConfigOutcome>
+where
+    F: FnMut(&str),
+{
+    let existing = match fs::read_to_string(destination) {
+        Ok(contents) => Some(contents),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+        Err(error) => {
+            return Err(error).with_context(|| format!("Failed to read {}", destination.display()));
+        }
+    };
+    if existing.as_deref().is_some_and(has_block) {
+        return Ok(ConfigOutcome::AlreadyConfigured);
+    }
+    let updated = match &existing {
+        Some(contents) => format!("{contents}\n{block}"),
+        None => block.to_string(),
+    };
+    if existing.is_some() {
+        let backup = next_backup_path(destination)?;
+        fs::copy(destination, &backup)
+            .with_context(|| format!("Failed to back up {}", destination.display()))?;
+        log(&format!(
+            "Existing configuration backed up to {}",
+            backup.display()
+        ));
+    }
+    write_atomically(destination, &updated)?;
+    log(&format!(
+        "Added mise PATH setup to {}",
+        destination.display()
+    ));
+    Ok(ConfigOutcome::Changed)
+}
+
+fn combine(outcomes: &[ConfigOutcome]) -> ConfigOutcome {
+    if outcomes.contains(&ConfigOutcome::Changed) {
+        ConfigOutcome::Changed
+    } else {
+        ConfigOutcome::AlreadyConfigured
+    }
+}
+
+const LEGACY_FISH_ACTIVATION: &str = "~/.local/bin/mise activate fish | source";
 
 fn update_shell_config<F>(
     destination: &Path,
@@ -191,7 +367,7 @@ where
     };
     let original = existing.as_deref().unwrap_or(defaults);
     let legacy = match shell {
-        "fish" => "~/.local/bin/mise activate fish | source",
+        "fish" => LEGACY_FISH_ACTIVATION,
         _ => "eval \"$($HOME/.local/bin/mise activate bash)\"",
     };
     let has_legacy = original.lines().any(|line| line == legacy);
@@ -232,7 +408,7 @@ where
 /// or full disk never leaves a truncated shell config. Symlinks (e.g. from a
 /// dotfile manager) are resolved so the link itself is preserved, and the
 /// original file permissions are kept.
-fn write_atomically(destination: &Path, contents: &str) -> Result<()> {
+pub(crate) fn write_atomically(destination: &Path, contents: &str) -> Result<()> {
     let target = if destination.is_symlink() {
         fs::canonicalize(destination)
             .with_context(|| format!("Failed to resolve symlink {}", destination.display()))?
@@ -267,7 +443,7 @@ fn next_staging_path(destination: &Path) -> Result<PathBuf> {
     next_numbered_path(destination, ".devenv-staging")
 }
 
-fn next_backup_path(destination: &Path) -> Result<PathBuf> {
+pub(crate) fn next_backup_path(destination: &Path) -> Result<PathBuf> {
     next_numbered_path(destination, ".bak")
 }
 
@@ -431,6 +607,83 @@ mod tests {
                 .to_string_lossy()
                 .contains("devenv-tmp")
         }));
+    }
+
+    #[test]
+    fn shell_path_should_use_existing_bash_profile_and_be_idempotent() {
+        let root = TestDir::new();
+        fs::write(root.path().join(".bash_profile"), "# fedora default\n").unwrap();
+
+        let first = setup_shell_path_in_home(root.path(), false, |_| {}).unwrap();
+        let second = setup_shell_path_in_home(root.path(), false, |_| {}).unwrap();
+
+        let profile = fs::read_to_string(root.path().join(".bash_profile")).unwrap();
+        assert_eq!(
+            (first, second),
+            (ConfigOutcome::Changed, ConfigOutcome::AlreadyConfigured)
+        );
+        assert!(profile.starts_with("# fedora default\n") && profile.contains(PROFILE_PATH));
+        assert_eq!(profile.matches(BLOCK_BEGIN).count(), 1);
+        assert!(!root.path().join(".profile").exists());
+        assert!(root.path().join(".bash_profile.bak").exists());
+    }
+
+    #[test]
+    fn profile_block_should_prepend_mise_dirs_once() {
+        let root = TestDir::new();
+        let profile = root.path().join(".profile");
+        fs::write(&profile, PROFILE_PATH).unwrap();
+
+        let output = std::process::Command::new("sh")
+            .args([
+                "-c",
+                ". \"$HOME/.profile\"; . \"$HOME/.profile\"; echo \"$PATH\"",
+            ])
+            .env("HOME", root.path())
+            .env("PATH", "/usr/bin:/bin")
+            .env_remove("MISE_DATA_DIR")
+            .env_remove("XDG_DATA_HOME")
+            .output()
+            .unwrap();
+
+        let home = root.path().display();
+        assert_eq!(
+            String::from_utf8_lossy(&output.stdout).trim(),
+            format!("{home}/.local/bin:{home}/.local/share/mise/shims:/usr/bin:/bin")
+        );
+    }
+
+    #[test]
+    fn fish_activation_should_use_conf_d_unless_config_fish_activates() {
+        let root = TestDir::new();
+        assert_eq!(
+            setup_shell_path_in_home(root.path(), true, |_| {}).unwrap(),
+            ConfigOutcome::Changed
+        );
+        assert!(root.path().join(FISH_ACTIVATION_FILE).exists());
+
+        let custom = TestDir::new();
+        let config = custom.path().join(".config/fish/config.fish");
+        fs::create_dir_all(config.parent().unwrap()).unwrap();
+        fs::write(&config, "mise activate fish | source\n").unwrap();
+        ensure_fish_activation(custom.path(), |_| {}).unwrap();
+        assert!(!custom.path().join(FISH_ACTIVATION_FILE).exists());
+    }
+
+    #[test]
+    fn fish_config_should_not_overwrite_existing_config_fish() {
+        let root = TestDir::new();
+        let config = root.path().join(".config/fish/config.fish");
+        fs::create_dir_all(config.parent().unwrap()).unwrap();
+        fs::write(&config, "set -g my_setting 1\n").unwrap();
+
+        setup_fish_config(root.path(), |_| {}).unwrap();
+
+        assert_eq!(
+            fs::read_to_string(&config).unwrap(),
+            "set -g my_setting 1\n"
+        );
+        assert!(root.path().join(FISH_ACTIVATION_FILE).exists());
     }
 
     struct TestDir(PathBuf);

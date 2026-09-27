@@ -13,7 +13,7 @@ to update or remove.
 ## Quick start
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/nguyenvulong/devenv-linux/main/install.sh | DEVENV_VERSION=v1.1.1 bash
+curl -fsSL https://raw.githubusercontent.com/nguyenvulong/devenv-linux/main/install.sh | DEVENV_VERSION=v1.2.0 bash
 ```
 
 Choose components with <kbd>Space</kbd>, press <kbd>Enter</kbd> to review, then
@@ -21,6 +21,8 @@ Choose components with <kbd>Space</kbd>, press <kbd>Enter</kbd> to review, then
 
 - Works on Ubuntu 24.04, Debian 13, Fedora 43, and Arch Linux (x86_64 and aarch64).
 - Nothing changes until you confirm. Existing configs are backed up first.
+- Missing system packages a choice depends on (curl, git, a C compiler) are
+  installed automatically and listed on the review screen.
 - The script checks the release checksum before running anything. Leave out
   `DEVENV_VERSION` to get the latest release.
 
@@ -28,7 +30,7 @@ Choose components with <kbd>Space</kbd>, press <kbd>Enter</kbd> to review, then
 
 | Category | Included |
 |---|---|
-| **Shells** | Fish with aliases and colors, mise activation for Bash and Fish |
+| **Shells** | mise and your tools on PATH in Bash and Fish (set up automatically), Fish with aliases and colors |
 | **Editor** | Neovim with the LazyVim starter and OSC 52 clipboard over SSH |
 | **Languages** | Rust, Node.js, Go, Python via uv |
 | **CLI tools** | ripgrep, fd, fzf, bat, eza, glow, jaq, Zellij |
@@ -70,6 +72,21 @@ version = "1.85.0"
 ```
 
 Run `devenv --help` for all options.
+
+## Uninstall
+
+Run the installer again and press <kbd>x</kbd>, or from the command line:
+
+```bash
+# Remove devenv's shell changes (mise and your tools stay)
+curl -fsSL https://raw.githubusercontent.com/nguyenvulong/devenv-linux/main/install.sh | bash -s -- --uninstall
+
+# Also remove mise and every tool it installed
+curl -fsSL https://raw.githubusercontent.com/nguyenvulong/devenv-linux/main/install.sh | bash -s -- --uninstall --purge
+```
+
+You see the full list of changes before confirming, and edited files are
+backed up first. Your Neovim config and system packages are never removed.
 
 ## License
 

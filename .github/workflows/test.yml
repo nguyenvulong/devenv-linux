@@ -42,12 +42,106 @@ jobs:
           cargo build --release --locked --manifest-path installer/Cargo.toml
           dist=$(mktemp -d)
           cp installer/target/release/devenv "$dist/devenv"
-          (cd "$dist" && tar -cJf x86_64.tar.xz devenv && sha256sum x86_64.tar.xz > SHA256SUMS)
-          DEVENV_DOWNLOAD_URL="file://$dist" bash install.sh --version
-          echo tampered >> "$dist/x86_64.tar.xz"
+          (cd "$dist" && tar -czf x86_64.tar.gz devenv && sha256sum x86_64.tar.gz > SHA256SUMS)
+          # The .tar.gz path must work without xz on PATH.
+          nox=$(mktemp -d)
+          for c in bash curl tar gzip sha256sum mktemp uname grep chmod rm; do ln -s "$(command -v "$c")" "$nox/$c"; done
+          PATH="$nox" DEVENV_DOWNLOAD_URL="file://$dist" bash install.sh --version
+          echo tampered >> "$dist/x86_64.tar.gz"
           if DEVENV_DOWNLOAD_URL="file://$dist" bash install.sh --version; then
             echo "install.sh accepted a tampered archive"
             exit 1
+          fi
+
+      - name: Upload devenv binary for bare-image tests
+        uses: actions/upload-artifact@v7
+        with:
+          name: devenv-linux-x86_64
+          path: installer/target/release/devenv
+          if-no-files-found: error
+
+  # ── Bare images: only curl is installed up front ─────────────────────────
+  # Checks the documented requirement (curl only), automatic system
+  # prerequisites (CA certificates, compiler for Rust), and that mise tools
+  # are on PATH without the optional Bash Configuration, for root and for a
+  # regular user switched to with `su` and `su -`. Arch is not covered: its
+  # images ship without a package database, and devenv never runs pacman -Sy.
+  bare:
+    name: Bare ${{ matrix.image }}
+    needs: lint
+    runs-on: ubuntu-latest
+    # mise downloads tools through the GitHub API; authenticate to avoid the
+    # shared-runner rate limit (HTTP 403).
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ['debian:trixie', 'fedora:43']
+    container:
+      image: ${{ matrix.image }}
+
+    steps:
+      # curl is the only documented requirement. useradd/su are test helpers.
+      - name: Install curl only
+        run: |
+          if command -v apt-get >/dev/null; then
+            apt-get update && apt-get install -y --no-install-recommends curl
+          else
+            dnf install -y curl shadow-utils util-linux
+          fi
+
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: devenv-linux-x86_64
+          path: dist
+
+      - name: Package a local release
+        run: |
+          cd dist
+          chmod +x devenv
+          tar -czf x86_64.tar.gz devenv
+          sha256sum x86_64.tar.gz > SHA256SUMS
+
+      - name: Install as root through install.sh (Rust + Node.js, no Bash config)
+        shell: bash
+        # Container jobs set HOME=/github/home; use root's real home so the
+        # su checks below read the files devenv wrote.
+        env:
+          HOME: /root
+        run: |
+          printf '[[components]]\nid="rust"\nenabled=true\n[[components]]\nid="node"\nenabled=true\n' > /tmp/root.toml
+          DEVENV_DOWNLOAD_URL="file://$PWD/dist" bash install.sh --config /tmp/root.toml
+          command -v cc
+
+      - name: Verify PATH for root
+        run: bash .github/scripts/verify-shell-path.sh root mise node rustc cargo
+
+      - name: Install as a regular user (Node.js only, no sudo needed)
+        shell: bash
+        run: |
+          useradd -m -s /bin/bash tester
+          printf '[[components]]\nid="node"\nenabled=true\n' > /home/tester/user.toml
+          cp -r dist install.sh /home/tester/
+          chown -R tester:tester /home/tester
+          su - tester -w GITHUB_TOKEN -c 'DEVENV_DOWNLOAD_URL="file://$HOME/dist" bash install.sh --config user.toml'
+
+      - name: Verify PATH for the regular user
+        run: bash .github/scripts/verify-shell-path.sh tester mise node
+
+      # Uninstall with --purge must restore the shell files and remove mise.
+      - name: Uninstall (purge) as the regular user
+        shell: bash
+        run: |
+          su - tester -c 'DEVENV_DOWNLOAD_URL="file://$HOME/dist" bash install.sh --uninstall --purge --yes'
+          if su - tester -c 'grep -l "devenv-linux" ~/.bashrc ~/.profile 2>/dev/null'; then
+            echo "devenv blocks left behind"; exit 1
+          fi
+          if su - tester -c 'test -e ~/.local/bin/mise || test -e ~/.local/share/mise'; then
+            echo "mise left behind after --purge"; exit 1
           fi
 
   # ── Full installation on each supported distro ───────────────────────────
@@ -55,6 +149,10 @@ jobs:
     name: Test on ${{ matrix.distro }}
     needs: lint
     runs-on: ubuntu-latest
+    # mise downloads tools through the GitHub API; authenticate to avoid the
+    # shared-runner rate limit (HTTP 403).
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -119,7 +217,7 @@ jobs:
             as_target() { bash -c "$1"; }
           else
             chown -R testuser:testuser .
-            as_target() { su - testuser -c "$1"; }
+            as_target() { su - testuser -w GITHUB_TOKEN -c "$1"; }
           fi
           as_target "$PWD/installer/target/release/devenv --all"
           as_target "bash $PWD/.github/scripts/verify-install.sh"
