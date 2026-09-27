@@ -78,25 +78,22 @@ jobs:
         run: cross build --release --target ${{ matrix.target }}
         working-directory: installer
 
-      - name: Package archive
+      # Both formats contain the same binary. install.sh uses .tar.gz because
+      # gzip ships with every base image; .tar.xz stays for existing links.
+      - name: Package archives
         run: |
-          VERSION="${{ needs.validate.outputs.version }}"
           ARCH="${{ matrix.arch }}"
-          BINARY="installer/target/${{ matrix.target }}/release/devenv"
-          ARCHIVE="${ARCH}.tar.xz"
-
-          cp "$BINARY" devenv
-          tar -cJf "$ARCHIVE" devenv
+          cp "installer/target/${{ matrix.target }}/release/devenv" devenv
+          tar -czf "${ARCH}.tar.gz" devenv
+          tar -cJf "${ARCH}.tar.xz" devenv
           rm devenv
-
-          echo "ARCHIVE=$ARCHIVE" >> "$GITHUB_ENV"
-          echo "Packaged: $ARCHIVE ($(du -sh "$ARCHIVE" | cut -f1))"
+          ls -lh "${ARCH}".tar.*
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
           name: devenv-${{ matrix.arch }}
-          path: ${{ matrix.arch }}.tar.xz
+          path: ${{ matrix.arch }}.tar.*
           if-no-files-found: error
 
   # ── Publish GitHub Release ──────────────────────────────────────────────────
@@ -122,13 +119,15 @@ jobs:
       - name: Generate checksums
         working-directory: dist
         run: |
-          sha256sum x86_64.tar.xz aarch64.tar.xz > SHA256SUMS
+          sha256sum x86_64.tar.gz aarch64.tar.gz x86_64.tar.xz aarch64.tar.xz > SHA256SUMS
           cat SHA256SUMS
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@v3
         with:
           subject-path: |
+            dist/x86_64.tar.gz
+            dist/aarch64.tar.gz
             dist/x86_64.tar.xz
             dist/aarch64.tar.xz
 
@@ -143,6 +142,8 @@ jobs:
           draft: ${{ github.event_name == 'workflow_dispatch' }}
           generate_release_notes: true
           files: |
+            dist/x86_64.tar.gz
+            dist/aarch64.tar.gz
             dist/x86_64.tar.xz
             dist/aarch64.tar.xz
             dist/SHA256SUMS
