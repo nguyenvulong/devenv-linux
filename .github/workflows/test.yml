@@ -104,6 +104,10 @@ jobs:
 
       - name: Install as root through install.sh (Rust + Node.js, no Bash config)
         shell: bash
+        # Container jobs set HOME=/github/home; use root's real home so the
+        # su checks below read the files devenv wrote.
+        env:
+          HOME: /root
         run: |
           printf '[[components]]\nid="rust"\nenabled=true\n[[components]]\nid="node"\nenabled=true\n' > /tmp/root.toml
           DEVENV_DOWNLOAD_URL="file://$PWD/dist" bash install.sh --config /tmp/root.toml
