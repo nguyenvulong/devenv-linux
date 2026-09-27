@@ -42,9 +42,12 @@ jobs:
           cargo build --release --locked --manifest-path installer/Cargo.toml
           dist=$(mktemp -d)
           cp installer/target/release/devenv "$dist/devenv"
-          (cd "$dist" && tar -cJf x86_64.tar.xz devenv && sha256sum x86_64.tar.xz > SHA256SUMS)
-          DEVENV_DOWNLOAD_URL="file://$dist" bash install.sh --version
-          echo tampered >> "$dist/x86_64.tar.xz"
+          (cd "$dist" && tar -czf x86_64.tar.gz devenv && sha256sum x86_64.tar.gz > SHA256SUMS)
+          # The .tar.gz path must work without xz on PATH.
+          nox=$(mktemp -d)
+          for c in bash curl tar gzip sha256sum mktemp uname grep chmod rm; do ln -s "$(command -v "$c")" "$nox/$c"; done
+          PATH="$nox" DEVENV_DOWNLOAD_URL="file://$dist" bash install.sh --version
+          echo tampered >> "$dist/x86_64.tar.gz"
           if DEVENV_DOWNLOAD_URL="file://$dist" bash install.sh --version; then
             echo "install.sh accepted a tampered archive"
             exit 1

@@ -50,7 +50,7 @@ devenv-linux/
 
 ## Installer Flow
 
-1. `install.sh` detects architecture, checks for curl/wget, tar, and xz, downloads `<arch>.tar.xz` and `SHA256SUMS` from `/releases/latest/download/` (or the `DEVENV_VERSION` tag, or `DEVENV_DOWNLOAD_URL`), verifies the checksum, extracts, and runs `devenv` without `exec` so its temporary directory is cleaned up.
+1. `install.sh` detects architecture, checks for curl/wget, tar, and gzip (printing a distro-specific install command when missing), downloads `<arch>.tar.gz` (falling back to `<arch>.tar.xz`, which needs xz, for releases up to v1.1.1) and `SHA256SUMS` from `/releases/latest/download/` (or the `DEVENV_VERSION` tag, or `DEVENV_DOWNLOAD_URL`), verifies the checksum, extracts, and runs `devenv` without `exec` so its temporary directory is cleaned up.
 2. `main.rs` parses arguments strictly: `--help`/`-h` and `--version`/`-v` win; unknown, duplicate, or conflicting (`--all` with `--config`) arguments exit with status 2.
 3. `main.rs` enters full headless mode for `--all` or `INSTALLER_ALL=1`. `CI=true` never triggers an install.
 4. `main.rs` enters config-driven headless mode when `--config <path>`, `--config=<path>`, or `-c <path>` is set.
@@ -72,7 +72,7 @@ devenv-linux/
 - No `tmux` or `nushell`
 - Search uses embedded `mise_registry.toml`, with runtime `mise registry` fallback when available
 - Config-driven headless installs use TOML component IDs from `devenv.example.toml`; mise tool versions default to `latest`
-- Release assets are named by architecture only (`x86_64.tar.xz`, `aarch64.tar.xz`) so `/releases/latest/download/...` URLs stay stable across versions. Every release also publishes `SHA256SUMS` and build provenance attestations; `install.sh` refuses to run an unverified archive.
+- Release assets are named by architecture only (`x86_64.tar.gz`, `aarch64.tar.gz`, plus the same binaries as `.tar.xz` for older links) so `/releases/latest/download/...` URLs stay stable across versions. Every release also publishes `SHA256SUMS` and build provenance attestations; `install.sh` refuses to run an unverified archive.
 
 ## Key Implementation Notes
 
