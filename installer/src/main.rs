@@ -251,6 +251,13 @@ fn run_headless_components(components: Vec<Component>, mode: &str) -> Result<(),
             println!("{}: {}", component.id, outcome_label(outcome));
         }
     }
+    let steps = executor::next_steps(&install_plan);
+    if !steps.is_empty() {
+        println!("\nNext steps:");
+        for step in steps {
+            println!("  - {step}");
+        }
+    }
     let failures = outcomes
         .values()
         .filter(|outcome| matches!(outcome, ComponentOutcome::Failed(_)))

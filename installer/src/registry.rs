@@ -236,6 +236,18 @@ impl InstallPlan {
         !self.mise.is_empty() || self.configs.iter().any(config_needs_mise)
     }
 
+    /// Installing mise tools (or a shell config) must leave mise and those
+    /// tools reachable from the user's shells.
+    pub fn needs_shell_setup(&self) -> bool {
+        !self.mise.is_empty() || self.configs.iter().any(config_needs_mise)
+    }
+
+    /// Whether the plan installs fish or its configuration.
+    pub fn involves_fish(&self) -> bool {
+        self.mise.iter().any(|c| c.id == "fish")
+            || self.configs.iter().any(|c| c.id == "config-fish")
+    }
+
     pub fn replaces_existing_nvim_config(&self) -> bool {
         self.configs.iter().any(|component| {
             component.id == "config-nvim"
@@ -448,7 +460,7 @@ pub fn get_all_components() -> Vec<Component> {
         Component::new(
             "config-bash",
             "Bash Configuration",
-            "Adds mise activation to ~/.bashrc",
+            "mise activation in ~/.bashrc and ~/.profile (added automatically with any mise tool)",
             Category::Config,
             Group::Configurations,
             None,

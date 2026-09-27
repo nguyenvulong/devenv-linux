@@ -121,7 +121,11 @@ fn fish_activation_selects_interactive_hooks_or_shims() {
             command.arg("-i");
         }
         let output = command
-            .args(["-c", "source \"$HOME/.config/fish/config.fish\""])
+            // Load conf.d then config.fish, as fish itself does on start.
+            .args([
+                "-c",
+                "source \"$HOME/.config/fish/conf.d/devenv-mise.fish\"; source \"$HOME/.config/fish/config.fish\"",
+            ])
             .env("HOME", &fixture.0)
             .env("PATH", fixture.0.join("bin"))
             .output()
@@ -173,5 +177,44 @@ fn bash_activation_falls_back_to_home_with_spaces() {
     assert_eq!(
         fs::read_to_string(home.join("activation.log")).unwrap(),
         "activate bash\n"
+    );
+}
+
+#[test]
+fn mise_tool_without_bash_config_still_puts_tools_on_path() {
+    // Regression: selecting a mise tool without "Bash Configuration" left
+    // mise and the tool unreachable from bash (e.g. after `su - user`).
+    let fixture = Fixture::new();
+    fixture.script("mise", "#!/bin/sh\nexit 0\n");
+    assert!(
+        fixture
+            .run("[[components]]\nid='node'\nenabled=true\n")
+            .status
+            .success()
+    );
+    for file in [".bashrc", ".profile"] {
+        let contents = fs::read_to_string(fixture.0.join(file)).unwrap();
+        assert!(contents.contains("# >>> devenv-linux >>>"), "{file}");
+    }
+
+    // A login shell with a bare PATH now finds mise and the tool's shim.
+    for (dir, name) in [(".local/bin", "mise"), (".local/share/mise/shims", "node")] {
+        let path = fixture.0.join(dir);
+        fs::create_dir_all(&path).unwrap();
+        fs::write(path.join(name), "#!/bin/sh\n").unwrap();
+        fs::set_permissions(path.join(name), fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    let output = Command::new("/bin/bash")
+        .args(["-lc", "command -v mise && command -v node"])
+        .env_clear()
+        .env("HOME", &fixture.0)
+        .env("PATH", "/usr/bin:/bin")
+        .output()
+        .unwrap();
+    let found = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "{found}");
+    assert!(
+        found.contains(".local/bin/mise") && found.contains("mise/shims/node"),
+        "{found}"
     );
 }

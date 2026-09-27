@@ -24,7 +24,8 @@ devenv-linux/
 │   └── images/          # README screenshots (SVG)
 ├── .github/
 │   ├── scripts/
-│   │   └── verify-install.sh
+│   │   ├── verify-install.sh
+│   │   └── verify-shell-path.sh
 │   └── workflows/
 │       ├── test.yml
 │       └── release.yml
@@ -63,7 +64,7 @@ devenv-linux/
    - system packages
    - mise tools
    - configurations
-11. The TUI event loop always polls input with a timeout (never busy-waits). After installation the log stays visible until Enter opens the summary.
+11. The TUI event loop always polls input with a timeout (never busy-waits). After installation the log stays visible until Enter opens the summary, which ends with "Next steps" (also printed by headless modes).
 
 ## Current Product Direction
 
@@ -91,7 +92,10 @@ devenv-linux/
 - Mise bootstrap downloads successfully to a temporary file before execution and verifies the resulting executable. It requires `curl` and fails early with a clear message when it is missing; LazyVim similarly requires `git`.
 - Log the mise version (honoring `MISE_VERSION`) and the LazyVim starter commit for reproducibility.
 - Command detection requires the executable bit and checks the mise shims directory resolved from `MISE_DATA_DIR`, then `$XDG_DATA_HOME/mise`, then `~/.local/share/mise`. Root detection uses `geteuid()`.
-- Shell activation resolves mise on PATH with a ~/.local/bin fallback. Fish uses interactive activation and noninteractive --shims; Bash hooks run only interactively.
+- Shell setup is implicit whenever a plan installs mise tools (or selects Bash/Fish configuration) and mise is ready: `~/.bashrc` gets interactive activation, the login profile (`~/.bash_profile`, `~/.bash_login`, or `~/.profile`, whichever bash reads) gets `~/.local/bin` plus the mise shims directory, and fish users get `~/.config/fish/conf.d/devenv-mise.fish` unless `config.fish` already activates mise. "Bash Configuration" is this same setup, selectable on its own. If shell setup fails, the mise tools installed in that run are reported as failed.
+- Every block devenv adds to a user file sits between `# >>> devenv-linux >>>` and `# <<< devenv-linux <<<` with a comment explaining it; keep this so blocks can be detected and removed.
+- "Fish Configuration" writes defaults to `config.fish` only when it does not exist; activation lives in the conf.d file. Never change the user's login shell.
+- Shell activation resolves mise on PATH with a ~/.local/bin fallback and is skipped when mise is missing. Fish uses interactive activation and noninteractive --shims; Bash hooks run only interactively.
 - Explicit shell configuration installs migrate exact legacy installer activation lines with numbered backups, ignore commented activation when detecting setup, and preserve custom activation blocks.
 - Config installs should be non-destructive and back up existing user files when overwriting. Shell config writes are atomic (temporary sibling + rename), preserve permissions, and follow symlinks so dotfile-manager links stay intact.
 - Default Fish config uses `fish_add_path --append` and defines colors, aliases, and the history wrapper only in interactive shells.
@@ -128,7 +132,8 @@ cargo test --locked
 shellcheck ../install.sh ../.github/scripts/*.sh
 ```
 
-CI (`test.yml`) runs a `lint` job with the commands above plus an end-to-end `install.sh` checksum test, then the per-distro `--all` install matrix, which verifies results with `.github/scripts/verify-install.sh`.
+CI (`test.yml`) runs a `lint` job with the commands above plus an end-to-end `install.sh` checksum test, then a `bare` job on plain Debian and Fedora images with only curl installed (checks automatic prerequisites and PATH for root and a `su` user via `.github/scripts/verify-shell-path.sh`), and the per-distro `--all` install matrix, which verifies results with `.github/scripts/verify-install.sh`.
+Scripts under `.github/scripts/` start with a header comment: purpose, usage, and what they check.
 
 ## Branches
 

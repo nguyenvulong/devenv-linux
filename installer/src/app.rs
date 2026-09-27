@@ -221,12 +221,16 @@ fn observe_component(component: &Component, home: &str) -> ObservedState {
                 .is_ok_and(|contents| {
                     crate::installer::config::has_shell_activation(&contents, "bash")
                 }),
-                "config-fish" => std::fs::read_to_string(
-                    std::path::Path::new(home).join(".config/fish/config.fish"),
-                )
-                .is_ok_and(|contents| {
-                    crate::installer::config::has_shell_activation(&contents, "fish")
-                }),
+                "config-fish" => {
+                    let home = std::path::Path::new(home);
+                    home.join(crate::installer::config::FISH_ACTIVATION_FILE)
+                        .exists()
+                        || std::fs::read_to_string(home.join(".config/fish/config.fish")).is_ok_and(
+                            |contents| {
+                                crate::installer::config::has_shell_activation(&contents, "fish")
+                            },
+                        )
+                }
                 _ => false,
             };
             if exists {
