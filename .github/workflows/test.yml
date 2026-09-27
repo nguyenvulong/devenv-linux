@@ -70,6 +70,10 @@ jobs:
     name: Bare ${{ matrix.image }}
     needs: lint
     runs-on: ubuntu-latest
+    # mise downloads tools through the GitHub API; authenticate to avoid the
+    # shared-runner rate limit (HTTP 403).
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -123,7 +127,7 @@ jobs:
           printf '[[components]]\nid="node"\nenabled=true\n' > /home/tester/user.toml
           cp -r dist install.sh /home/tester/
           chown -R tester:tester /home/tester
-          su - tester -c 'DEVENV_DOWNLOAD_URL="file://$HOME/dist" bash install.sh --config user.toml'
+          su - tester -w GITHUB_TOKEN -c 'DEVENV_DOWNLOAD_URL="file://$HOME/dist" bash install.sh --config user.toml'
 
       - name: Verify PATH for the regular user
         run: bash .github/scripts/verify-shell-path.sh tester mise node
@@ -133,6 +137,10 @@ jobs:
     name: Test on ${{ matrix.distro }}
     needs: lint
     runs-on: ubuntu-latest
+    # mise downloads tools through the GitHub API; authenticate to avoid the
+    # shared-runner rate limit (HTTP 403).
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -197,7 +205,7 @@ jobs:
             as_target() { bash -c "$1"; }
           else
             chown -R testuser:testuser .
-            as_target() { su - testuser -c "$1"; }
+            as_target() { su - testuser -w GITHUB_TOKEN -c "$1"; }
           fi
           as_target "$PWD/installer/target/release/devenv --all"
           as_target "bash $PWD/.github/scripts/verify-install.sh"
