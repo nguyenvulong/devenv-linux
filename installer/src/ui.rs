@@ -222,7 +222,7 @@ fn draw_selection(f: &mut Frame, app: &mut App) {
 }
 
 fn draw_review(f: &mut Frame, app: &App) {
-    let plan = InstallPlan::from_components(&app.components);
+    let plan = InstallPlan::for_environment(&app.components);
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -287,29 +287,23 @@ fn draw_review(f: &mut Frame, app: &App) {
             Span::raw("mise will be installed if it is missing."),
         ]));
     }
-    for (command, reason) in plan.required_commands() {
-        if (command == "curl" && crate::installer::mise::is_installed())
-            || crate::sys::check_command_exists(command)
-        {
-            continue;
-        }
-        if plan.installs_base_deps() {
-            notes.push(Line::from(vec![
-                Span::styled("Prerequisite: ", theme::shortcut_key_style()),
-                Span::raw(format!(
-                    "{command} for {reason} will be installed by Base Dependencies."
-                )),
-            ]));
-        } else {
-            notes.push(Line::from(Span::styled(
-                format!(
-                    "Missing: {command} is required for {reason}; select Base Dependencies or install it."
-                ),
-                Style::default().fg(theme::COLOR_WARNING),
-            )));
-        }
+    if !plan.prerequisites.is_empty() {
+        let names: Vec<&str> = plan.prerequisites.iter().map(|(p, _)| p.label()).collect();
+        notes.push(Line::from(vec![
+            Span::styled("System prerequisites: ", theme::shortcut_key_style()),
+            Span::raw(format!("{} will be installed.", names.join(", "))),
+        ]));
     }
-    if plan.needs_sudo() {
+    if plan.needs_sudo() && !crate::installer::system::can_install_packages() {
+        notes.push(Line::from(Span::styled(
+            "Warning: sudo is not installed. System packages will fail; run devenv as root or install sudo.",
+            Style::default().fg(theme::COLOR_WARNING),
+        )));
+    }
+    if plan.needs_sudo()
+        && !crate::sys::is_root()
+        && crate::installer::system::can_install_packages()
+    {
         notes.push(Line::from(vec![
             Span::styled("Privilege: ", theme::shortcut_key_style()),
             Span::raw("sudo authentication follows confirmation."),

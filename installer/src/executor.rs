@@ -17,9 +17,16 @@ pub fn execute_plan<L>(
 {
     on_phase(0);
     log(&format!(">>> Phase 1: {}", PHASES[0]));
-    if !plan.system.is_empty() {
+    let prerequisites: Vec<_> = plan.prerequisites.iter().map(|(p, _)| *p).collect();
+    if !plan.system.is_empty() || !prerequisites.is_empty() {
+        for (prerequisite, reason) in &plan.prerequisites {
+            log(&format!(
+                "Prerequisite: {} (for {reason})",
+                prerequisite.label()
+            ));
+        }
         let components: Vec<&Component> = plan.system.iter().collect();
-        let result = system::install_system_packages(&components, log.clone());
+        let result = system::install_system_packages(&components, &prerequisites, log.clone());
         if let Err(error) = &result {
             log(&format!("[ERROR] System packages: {error}"));
         }
@@ -78,7 +85,7 @@ pub fn execute_plan<L>(
         }
         if component.id == "config-nvim" && !check_command_exists("git") {
             let error = "git is required to clone the LazyVim starter; \
-                         install Base Dependencies or git first";
+                         install Build Tools or git first";
             log(&format!("[ERROR] config {}: {error}", component.id));
             on_outcome(&component.id, ComponentOutcome::Failed(error.to_string()));
             continue;
@@ -106,7 +113,7 @@ where
     L: Fn(&str) + Send + Clone + 'static,
 {
     if !mise::is_installed() && !check_command_exists("curl") {
-        bail!("curl is required to bootstrap mise; install Base Dependencies or curl first");
+        bail!("curl is required to bootstrap mise; install Build Tools or curl first");
     }
     mise::install_mise(log.clone())
 }

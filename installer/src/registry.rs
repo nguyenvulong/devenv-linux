@@ -146,12 +146,35 @@ impl Component {
     }
 }
 
+/// System packages that selected components depend on but that are not
+/// components themselves. They are added to a plan automatically when missing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Prerequisite {
+    Curl,
+    CaCertificates,
+    Git,
+    Compiler,
+}
+
+impl Prerequisite {
+    pub fn label(self) -> &'static str {
+        match self {
+            Prerequisite::Curl => "curl",
+            Prerequisite::CaCertificates => "CA certificates",
+            Prerequisite::Git => "git",
+            Prerequisite::Compiler => "C compiler",
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct InstallPlan {
     pub system: Vec<Component>,
     pub mise: Vec<Component>,
     pub deactivate_mise: Vec<Component>,
     pub configs: Vec<Component>,
+    /// Missing system prerequisites and why the plan needs them.
+    pub prerequisites: Vec<(Prerequisite, &'static str)>,
     pub kept_count: usize,
 }
 
@@ -172,11 +195,23 @@ impl InstallPlan {
             configs: collect_components(components, ComponentAction::Install, |category| {
                 matches!(category, Category::Config)
             }),
+            prerequisites: Vec::new(),
             kept_count: components
                 .iter()
                 .filter(|component| component.action == ComponentAction::Keep)
                 .count(),
         }
+    }
+
+    /// Build the plan and add the system prerequisites missing on this machine.
+    pub fn for_environment(components: &[Component]) -> Self {
+        let mut plan = Self::from_components(components);
+        plan.prerequisites = missing_prerequisites(
+            &plan,
+            crate::installer::mise::is_installed(),
+            crate::installer::system::is_present,
+        );
+        plan
     }
 
     pub fn is_empty(&self) -> bool {
@@ -190,35 +225,13 @@ impl InstallPlan {
         self.system.len() + self.mise.len() + self.deactivate_mise.len() + self.configs.len()
     }
 
+    /// Whether the system package manager (and so root or sudo) is needed.
     pub fn needs_sudo(&self) -> bool {
-        !self.system.is_empty()
+        !self.system.is_empty() || !self.prerequisites.is_empty()
     }
 
     pub fn needs_mise_install(&self) -> bool {
         !self.mise.is_empty() || self.configs.iter().any(config_needs_mise)
-    }
-
-    pub fn installs_base_deps(&self) -> bool {
-        self.system
-            .iter()
-            .any(|component| component.id == "base-deps")
-    }
-
-    /// Commands the plan relies on that are not installed by the plan itself,
-    /// paired with the reason each is needed.
-    pub fn required_commands(&self) -> Vec<(&'static str, &'static str)> {
-        let mut commands = Vec::new();
-        if self.needs_mise_install() {
-            commands.push(("curl", "bootstrapping mise"));
-        }
-        if self
-            .configs
-            .iter()
-            .any(|component| component.id == "config-nvim")
-        {
-            commands.push(("git", "cloning the LazyVim starter"));
-        }
-        commands
     }
 
     pub fn replaces_existing_nvim_config(&self) -> bool {
@@ -227,6 +240,41 @@ impl InstallPlan {
                 && matches!(component.observed, ObservedState::ExistingConfig)
         })
     }
+}
+
+/// The system prerequisites a plan relies on, minus those `present` reports as
+/// installed. mise is only bootstrapped (and so only needs curl) when missing.
+pub fn missing_prerequisites(
+    plan: &InstallPlan,
+    mise_installed: bool,
+    present: impl Fn(Prerequisite) -> bool,
+) -> Vec<(Prerequisite, &'static str)> {
+    let mut needed: Vec<(Prerequisite, &'static str)> = Vec::new();
+    let mut need = |prerequisite, reason| {
+        if !needed.iter().any(|(p, _)| *p == prerequisite) {
+            needed.push((prerequisite, reason));
+        }
+    };
+    if plan.needs_mise_install() && !mise_installed {
+        need(Prerequisite::Curl, "bootstrapping mise");
+        need(Prerequisite::CaCertificates, "bootstrapping mise");
+    }
+    if plan.configs.iter().any(|c| c.id == "config-nvim") {
+        need(Prerequisite::Git, "cloning LazyVim");
+        need(
+            Prerequisite::Compiler,
+            "building Neovim tree-sitter parsers",
+        );
+    }
+    if plan
+        .mise
+        .iter()
+        .any(|c| matches!(&c.category, Category::Mise(tool) if tool == "rust"))
+    {
+        need(Prerequisite::Compiler, "linking Rust programs");
+    }
+    needed.retain(|(prerequisite, _)| !present(*prerequisite));
+    needed
 }
 
 pub fn config_needs_mise(component: &Component) -> bool {
@@ -250,8 +298,8 @@ pub fn get_all_components() -> Vec<Component> {
         // ── System ───────────────────────────────────────────────────────────
         Component::new(
             "base-deps",
-            "Base Dependencies",
-            "Compilers, curl, git, tar, unzip",
+            "Build Tools",
+            "Compilers, make, git, curl, unzip, xz",
             Category::SystemPackage,
             Group::System,
             None,
@@ -520,20 +568,56 @@ mod tests {
         assert!(!InstallPlan::from_components(&[component]).needs_mise_install());
     }
 
+    fn install(mut component: Component) -> Component {
+        component.action = ComponentAction::Install;
+        component
+    }
+
     #[test]
-    fn plan_should_list_commands_needed_by_prerequisites() {
-        let mut bash = config_component("config-bash");
-        bash.action = ComponentAction::Install;
-        let mut nvim = config_component("config-nvim");
-        nvim.action = ComponentAction::Install;
+    fn prerequisites_should_follow_selected_components() {
+        let plan = InstallPlan::from_components(&[
+            install(mise_component()),
+            install(config_component("config-nvim")),
+        ]);
 
         assert_eq!(
-            InstallPlan::from_components(&[bash, nvim]).required_commands(),
+            missing_prerequisites(&plan, false, |_| false),
             vec![
-                ("curl", "bootstrapping mise"),
-                ("git", "cloning the LazyVim starter"),
+                (Prerequisite::Curl, "bootstrapping mise"),
+                (Prerequisite::CaCertificates, "bootstrapping mise"),
+                (Prerequisite::Git, "cloning LazyVim"),
+                (
+                    Prerequisite::Compiler,
+                    "building Neovim tree-sitter parsers"
+                ),
             ]
         );
+    }
+
+    #[test]
+    fn prerequisites_should_skip_present_ones_and_existing_mise() {
+        let plan = InstallPlan::from_components(&[install(mise_component())]);
+
+        assert_eq!(
+            missing_prerequisites(&plan, true, |p| p != Prerequisite::Compiler),
+            vec![(Prerequisite::Compiler, "linking Rust programs")]
+        );
+        assert!(missing_prerequisites(&plan, true, |_| true).is_empty());
+    }
+
+    #[test]
+    fn empty_plan_should_need_no_prerequisites() {
+        let plan = InstallPlan::from_components(&get_all_components());
+
+        assert!(missing_prerequisites(&plan, false, |_| false).is_empty());
+    }
+
+    #[test]
+    fn missing_prerequisites_should_require_the_package_manager() {
+        let mut plan = InstallPlan::from_components(&[]);
+        plan.prerequisites = vec![(Prerequisite::Git, "cloning LazyVim")];
+
+        assert!(plan.needs_sudo());
     }
 
     #[test]

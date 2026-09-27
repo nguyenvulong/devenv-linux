@@ -3,7 +3,8 @@
 # Edit enabled/version values, then run:
 # ./devenv --config devenv.example.toml
 
-# System packages
+# System packages: Build Tools (compilers, make, git, curl, unzip, xz).
+# Prerequisites that other components need are installed automatically.
 
 [[components]]
 id = "base-deps"

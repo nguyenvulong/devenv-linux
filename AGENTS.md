@@ -57,8 +57,8 @@ devenv-linux/
 5. Config-driven headless mode reads TOML from `headless_config.rs`, selects only enabled component IDs, and applies pinned versions only to `mise` tools.
 6. The TUI refuses to start without a terminal on stdout or when `CI=true`. It installs a panic hook that restores the terminal, draws a loading screen, then probes PATH tools, existing configs, and globally configured mise versions concurrently, and loads the searchable `mise` manifest.
 7. Every TUI component starts at Keep. Users explicitly choose Install or, for globally configured mise tools only, Deactivate.
-8. Enter opens a review containing only planned mutations, kept count, implicit prerequisites (mise, plus missing `curl`/`git` commands), and replacement warnings. A second Enter confirms execution.
-9. After review confirmation, `sudo -v` runs in the normal terminal only if planned system-package installations need it.
+8. Enter opens a review containing only planned mutations, kept count, implicit prerequisites (mise and missing system prerequisites), a warning when sudo is unavailable, and replacement warnings. A second Enter confirms execution.
+9. After review confirmation, `sudo -v` runs in the normal terminal only if planned system packages (selected Build Tools or missing prerequisites) need it and the user is not root.
 10. `executor.rs` runs installation in 3 phases for both the TUI and headless modes and records each component outcome independently:
    - system packages
    - mise tools
@@ -81,6 +81,8 @@ devenv-linux/
 - TUI actions are Keep, Install, and Deactivate. Space toggles Keep/Install and returns Deactivate to Keep; there is no bulk-deactivate action.
 - Deactivate is available only when `mise ls --global --json <tool>` proves global ownership. Remove every requested global version with `mise unuse --global --no-prune <tool@version>`.
 - PATH-only and locally configured tools cannot be deactivated. System packages and configurations have no removal behavior.
+- System prerequisites are implicit, never components: `InstallPlan::for_environment` adds the ones the plan needs and the machine lacks (curl + CA certificates to bootstrap mise when missing; git + a C compiler for LazyVim; a C compiler for Rust). Phase 1 installs them with the package manager together with the optional Build Tools (`base-deps`). `InstallPlan::from_components` stays pure for tests.
+- Without root or sudo, the review warns up front and the system phase fails with a clear message instead of crashing.
 - Mise installation is lazy. It is an implicit prerequisite only for selected mise-tool installs and Bash/Fish configuration.
 - Headless installs record and print per-component outcomes, continue independent work after failures, and exit nonzero if any component fails.
 - Arch package installation uses existing databases with `pacman -S --needed`; users must complete a full system upgrade separately when databases/packages are stale. Never run a standalone `pacman -Sy`.
