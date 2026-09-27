@@ -10,6 +10,15 @@ const CA_BUNDLES: [&str; 3] = [
     "/etc/ssl/cert.pem",
 ];
 
+/// Directories where distros install libatomic.so.1 (needed by Node.js builds).
+const LIB_DIRS: [&str; 5] = [
+    "/usr/lib64",
+    "/usr/lib",
+    "/usr/lib/x86_64-linux-gnu",
+    "/usr/lib/aarch64-linux-gnu",
+    "/lib64",
+];
+
 /// Whether a system prerequisite is already available on this machine.
 pub fn is_present(prerequisite: Prerequisite) -> bool {
     match prerequisite {
@@ -17,6 +26,9 @@ pub fn is_present(prerequisite: Prerequisite) -> bool {
         Prerequisite::CaCertificates => CA_BUNDLES.iter().any(|path| Path::new(path).is_file()),
         Prerequisite::Git => check_command_exists("git"),
         Prerequisite::Compiler => check_command_exists("cc"),
+        Prerequisite::Libatomic => LIB_DIRS
+            .iter()
+            .any(|dir| Path::new(dir).join("libatomic.so.1").exists()),
     }
 }
 
@@ -36,6 +48,9 @@ fn prerequisite_packages(
         (Prerequisite::Compiler, DistroFamily::Debian) => &["build-essential"],
         (Prerequisite::Compiler, DistroFamily::Arch) => &["base-devel"],
         (Prerequisite::Compiler, _) => &["gcc", "gcc-c++", "make"],
+        (Prerequisite::Libatomic, DistroFamily::Debian) => &["libatomic1"],
+        (Prerequisite::Libatomic, DistroFamily::Arch) => &["gcc-libs"],
+        (Prerequisite::Libatomic, _) => &["libatomic"],
     }
 }
 
@@ -211,6 +226,10 @@ mod tests {
         assert_eq!(
             packages_for(DistroFamily::Arch, &[], &[Prerequisite::Compiler]),
             vec!["base-devel"]
+        );
+        assert_eq!(
+            packages_for(DistroFamily::RedHat, &[], &[Prerequisite::Libatomic]),
+            vec!["libatomic"]
         );
     }
 
