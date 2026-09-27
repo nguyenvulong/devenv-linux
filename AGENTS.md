@@ -91,7 +91,7 @@ devenv-linux/
 - Arch package installation uses existing databases with `pacman -S --needed`; users must complete a full system upgrade separately when databases/packages are stale. Never run a standalone `pacman -Sy`.
 - Root installations call package managers directly and do not require sudo.
 - Distro detection parses quoted ID values and whitespace-separated ID_LIKE tokens, including rhel.
-- Mise bootstrap downloads successfully to a temporary file before execution and verifies the resulting executable. It requires `curl` and fails early with a clear message when it is missing; LazyVim similarly requires `git`.
+- Mise bootstrap downloads successfully to a temporary file before execution, is retried up to 3 times on failure, and verifies the resulting executable. It requires `curl` and fails early with a clear message when it is missing; LazyVim similarly requires `git`.
 - Log the mise version (honoring `MISE_VERSION`) and the LazyVim starter commit for reproducibility.
 - Command detection requires the executable bit and checks the mise shims directory resolved from `MISE_DATA_DIR`, then `$XDG_DATA_HOME/mise`, then `~/.local/share/mise`. Root detection uses `geteuid()`.
 - Shell setup is implicit whenever a plan installs mise tools (or selects Bash/Fish configuration) and mise is ready: `~/.bashrc` gets interactive activation, the login profile (`~/.bash_profile`, `~/.bash_login`, or `~/.profile`, whichever bash reads) gets `~/.local/bin` plus the mise shims directory, and fish users get `~/.config/fish/conf.d/devenv-mise.fish` unless `config.fish` already activates mise. "Bash Configuration" is this same setup, selectable on its own. If shell setup fails, the mise tools installed in that run are reported as failed.

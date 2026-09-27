@@ -95,7 +95,12 @@ fn failed_download_never_executes_partial_script() {
     assert!(!output.status.success());
     assert!(!fixture.0.join("executed").exists());
     assert!(!fixture.0.join(".bashrc").exists());
-    assert!(String::from_utf8_lossy(&output.stdout).contains("mise prerequisite"));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("mise prerequisite"));
+    assert!(
+        stdout.contains("attempt 2/3"),
+        "bootstrap should be retried:\n{stdout}"
+    );
 }
 
 #[test]
