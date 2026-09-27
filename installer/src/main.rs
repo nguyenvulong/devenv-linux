@@ -214,8 +214,12 @@ fn run_headless_components(components: Vec<Component>, mode: &str) -> Result<(),
     println!("==> devenv-linux headless installer ({mode})");
     println!();
 
-    let install_plan = InstallPlan::from_components(&components);
-    if install_plan.needs_sudo() && !sys::is_root() {
+    let install_plan = InstallPlan::for_environment(&components);
+    if install_plan.needs_sudo() && !installer::system::can_install_packages() {
+        println!(
+            "Warning: sudo is not installed; system packages will fail. Run as root or install sudo."
+        );
+    } else if install_plan.needs_sudo() && !sys::is_root() {
         println!("Some components require elevated privileges (sudo).");
         let status = Command::new("sudo")
             .arg("-v")
@@ -320,7 +324,7 @@ where
             Screen::Review => match key.code {
                 KeyCode::Esc => app.screen = Screen::Selection,
                 KeyCode::Enter => {
-                    let plan = InstallPlan::from_components(&app.components);
+                    let plan = InstallPlan::for_environment(&app.components);
                     if plan.needs_sudo() && !ensure_sudo_credentials_for_install()? {
                         continue;
                     }
@@ -376,7 +380,8 @@ fn handle_selection_action_key(app: &mut App, key: KeyCode) -> bool {
 }
 
 fn ensure_sudo_credentials_for_install() -> Result<bool, Box<dyn Error>> {
-    if sys::is_root() {
+    // Without sudo the system phase fails with a clear error (shown in review).
+    if sys::is_root() || !installer::system::can_install_packages() {
         return Ok(true);
     }
     if has_cached_sudo_credentials()? {
@@ -450,7 +455,7 @@ fn spawn_installation(app: &mut App) {
     let done_flag = Arc::clone(&app.install_done);
     let install_index = Arc::clone(&app.install_index);
     let outcomes = Arc::clone(&app.outcomes);
-    let install_plan = InstallPlan::from_components(&app.components);
+    let install_plan = InstallPlan::for_environment(&app.components);
 
     thread::spawn(move || {
         let log = {

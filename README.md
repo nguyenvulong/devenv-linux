@@ -21,6 +21,8 @@ Choose components with <kbd>Space</kbd>, press <kbd>Enter</kbd> to review, then
 
 - Works on Ubuntu 24.04, Debian 13, Fedora 43, and Arch Linux (x86_64 and aarch64).
 - Nothing changes until you confirm. Existing configs are backed up first.
+- Missing system packages a choice depends on (curl, git, a C compiler) are
+  installed automatically and listed on the review screen.
 - The script checks the release checksum before running anything. Leave out
   `DEVENV_VERSION` to get the latest release.
 
