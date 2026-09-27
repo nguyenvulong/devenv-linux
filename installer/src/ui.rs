@@ -398,12 +398,13 @@ fn draw_installing(f: &mut Frame, app: &mut App) {
 }
 
 fn draw_report(f: &mut Frame, app: &mut App) {
+    let steps = crate::executor::next_steps(&InstallPlan::from_components(&app.components));
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3),
             Constraint::Min(10),
-            Constraint::Length(3),
+            Constraint::Length(steps.len() as u16 + 3),
         ])
         .split(f.area());
 
@@ -491,9 +492,20 @@ fn draw_report(f: &mut Frame, app: &mut App) {
 
     f.render_widget(table, chunks[1]);
 
-    let footer = Paragraph::new(" Press 'q' or <Enter> to exit ")
-        .style(Style::default().fg(theme::COLOR_MUTED))
-        .block(theme::default_block());
+    let mut footer_lines: Vec<Line> = steps
+        .iter()
+        .map(|step| {
+            Line::from(vec![
+                Span::styled(" → ", theme::success_text_style()),
+                Span::raw(step.clone()),
+            ])
+        })
+        .collect();
+    footer_lines.push(Line::from(Span::styled(
+        " Press 'q' or <Enter> to exit",
+        Style::default().fg(theme::COLOR_MUTED),
+    )));
+    let footer = Paragraph::new(footer_lines).block(theme::default_block().title(" Next steps "));
     f.render_widget(footer, chunks[2]);
 }
 

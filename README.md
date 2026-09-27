@@ -30,7 +30,7 @@ Choose components with <kbd>Space</kbd>, press <kbd>Enter</kbd> to review, then
 
 | Category | Included |
 |---|---|
-| **Shells** | Fish with aliases and colors, mise activation for Bash and Fish |
+| **Shells** | mise and your tools on PATH in Bash and Fish (set up automatically), Fish with aliases and colors |
 | **Editor** | Neovim with the LazyVim starter and OSC 52 clipboard over SSH |
 | **Languages** | Rust, Node.js, Go, Python via uv |
 | **CLI tools** | ripgrep, fd, fzf, bat, eza, glow, jaq, Zellij |
