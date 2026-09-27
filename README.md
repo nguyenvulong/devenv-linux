@@ -73,6 +73,21 @@ version = "1.85.0"
 
 Run `devenv --help` for all options.
 
+## Uninstall
+
+Run the installer again and press <kbd>x</kbd>, or from the command line:
+
+```bash
+# Remove devenv's shell changes (mise and your tools stay)
+curl -fsSL https://raw.githubusercontent.com/nguyenvulong/devenv-linux/main/install.sh | bash -s -- --uninstall
+
+# Also remove mise and every tool it installed
+curl -fsSL https://raw.githubusercontent.com/nguyenvulong/devenv-linux/main/install.sh | bash -s -- --uninstall --purge
+```
+
+You see the full list of changes before confirming, and edited files are
+backed up first. Your Neovim config and system packages are never removed.
+
 ## License
 
 MIT

@@ -132,6 +132,18 @@ jobs:
       - name: Verify PATH for the regular user
         run: bash .github/scripts/verify-shell-path.sh tester mise node
 
+      # Uninstall with --purge must restore the shell files and remove mise.
+      - name: Uninstall (purge) as the regular user
+        shell: bash
+        run: |
+          su - tester -c 'DEVENV_DOWNLOAD_URL="file://$HOME/dist" bash install.sh --uninstall --purge --yes'
+          if su - tester -c 'grep -l "devenv-linux" ~/.bashrc ~/.profile 2>/dev/null'; then
+            echo "devenv blocks left behind"; exit 1
+          fi
+          if su - tester -c 'test -e ~/.local/bin/mise || test -e ~/.local/share/mise'; then
+            echo "mise left behind after --purge"; exit 1
+          fi
+
   # ── Full installation on each supported distro ───────────────────────────
   test:
     name: Test on ${{ matrix.distro }}

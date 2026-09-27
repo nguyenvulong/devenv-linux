@@ -18,6 +18,8 @@ pub enum Screen {
     Installing,
     Report,
     Search,
+    Uninstall,
+    UninstallDone,
 }
 
 pub struct App {
@@ -34,6 +36,8 @@ pub struct App {
     pub search_query: String,
     pub search_results: Vec<ManifestTool>,
     pub search_cursor: usize,
+    pub uninstall_plan: Option<crate::installer::uninstall::UninstallPlan>,
+    pub uninstall_results: Vec<(String, Result<(), String>)>,
 }
 
 impl App {
@@ -88,7 +92,38 @@ impl App {
             search_query: String::new(),
             search_results,
             search_cursor: 0,
+            uninstall_plan: None,
+            uninstall_results: Vec::new(),
         }
+    }
+
+    /// Build the uninstall plan and show it for review.
+    pub fn open_uninstall(&mut self, purge: bool) {
+        match crate::installer::uninstall::plan(purge) {
+            Ok(plan) => {
+                self.uninstall_plan = Some(plan);
+                self.screen = Screen::Uninstall;
+                self.notice = None;
+            }
+            Err(error) => self.notice = Some(format!("Cannot plan uninstall: {error}")),
+        }
+    }
+
+    pub fn toggle_uninstall_purge(&mut self) {
+        let purge = self.uninstall_plan.as_ref().is_some_and(|plan| plan.purge);
+        self.open_uninstall(!purge);
+    }
+
+    /// Carry out the reviewed uninstall plan; nothing happens if it is empty.
+    pub fn run_uninstall(&mut self) {
+        let Some(plan) = &self.uninstall_plan else {
+            return;
+        };
+        if plan.is_empty() {
+            return;
+        }
+        self.uninstall_results = crate::installer::uninstall::execute(plan, |_| {});
+        self.screen = Screen::UninstallDone;
     }
 
     pub fn next(&mut self) {
@@ -298,6 +333,8 @@ mod tests {
             search_query: String::new(),
             search_results: Vec::new(),
             search_cursor: 0,
+            uninstall_plan: None,
+            uninstall_results: Vec::new(),
         }
     }
 

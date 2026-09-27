@@ -111,7 +111,7 @@ vim.g.clipboard = {
     }
 }
 
-const FISH_DEFAULTS: &str = r#"
+pub(crate) const FISH_DEFAULTS: &str = r#"
 # path
 fish_add_path --append ~/.local/bin ~/.local/share/mise/shims
 
@@ -137,10 +137,10 @@ end
 
 "#;
 
-/// Every block devenv adds to a user file starts with this marker and ends with
-/// "# <<< devenv-linux <<<", so it can be found again (to skip re-adding it,
-/// or to remove it on uninstall).
-const BLOCK_BEGIN: &str = "# >>> devenv-linux >>>";
+/// Every block devenv adds to a user file sits between these markers, so it
+/// can be found again (to skip re-adding it, or to remove it on uninstall).
+pub(crate) const BLOCK_BEGIN: &str = "# >>> devenv-linux >>>";
+pub(crate) const BLOCK_END: &str = "# <<< devenv-linux <<<";
 
 /// Appended to ~/.bashrc: interactive bash activates mise.
 const BASH_ACTIVATION: &str = r#"# >>> devenv-linux >>>
@@ -408,7 +408,7 @@ where
 /// or full disk never leaves a truncated shell config. Symlinks (e.g. from a
 /// dotfile manager) are resolved so the link itself is preserved, and the
 /// original file permissions are kept.
-fn write_atomically(destination: &Path, contents: &str) -> Result<()> {
+pub(crate) fn write_atomically(destination: &Path, contents: &str) -> Result<()> {
     let target = if destination.is_symlink() {
         fs::canonicalize(destination)
             .with_context(|| format!("Failed to resolve symlink {}", destination.display()))?
@@ -443,7 +443,7 @@ fn next_staging_path(destination: &Path) -> Result<PathBuf> {
     next_numbered_path(destination, ".devenv-staging")
 }
 
-fn next_backup_path(destination: &Path) -> Result<PathBuf> {
+pub(crate) fn next_backup_path(destination: &Path) -> Result<PathBuf> {
     next_numbered_path(destination, ".bak")
 }
 

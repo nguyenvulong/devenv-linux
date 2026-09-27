@@ -12,6 +12,8 @@ test -s "$devenv_script"
 sh "$devenv_script"
 "#;
 
+const BOOTSTRAP_ATTEMPTS: u32 = 3;
+
 pub fn install_mise<F>(mut log: F) -> Result<()>
 where
     F: FnMut(&str) + Send + 'static + Clone,
@@ -29,9 +31,22 @@ where
         }
         _ => log("Installing the latest mise (set MISE_VERSION to pin)..."),
     }
-    let result = run_cmd_streaming("sh", &["-c", MISE_BOOTSTRAP], log.clone())?;
-    if !result.success {
-        return Err(anyhow!("Failed to install mise: {}", result.stderr.trim()));
+    // The bootstrap downloads twice (script, then release); retry the whole
+    // thing so one dropped connection does not fail every mise component.
+    let mut attempt = 1;
+    loop {
+        let result = run_cmd_streaming("sh", &["-c", MISE_BOOTSTRAP], log.clone())?;
+        if result.success {
+            break;
+        }
+        if attempt == BOOTSTRAP_ATTEMPTS {
+            return Err(anyhow!("Failed to install mise: {}", result.stderr.trim()));
+        }
+        log(&format!(
+            "mise bootstrap failed (attempt {attempt}/{BOOTSTRAP_ATTEMPTS}); retrying..."
+        ));
+        std::thread::sleep(std::time::Duration::from_secs(2 * attempt as u64));
+        attempt += 1;
     }
     let version = mise_version().context("mise bootstrap completed but verification failed")?;
     log(&format!("Installed mise {version}."));
