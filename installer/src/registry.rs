@@ -154,6 +154,7 @@ pub enum Prerequisite {
     CaCertificates,
     Git,
     Compiler,
+    Libatomic,
 }
 
 impl Prerequisite {
@@ -163,6 +164,7 @@ impl Prerequisite {
             Prerequisite::CaCertificates => "CA certificates",
             Prerequisite::Git => "git",
             Prerequisite::Compiler => "C compiler",
+            Prerequisite::Libatomic => "libatomic",
         }
     }
 }
@@ -272,6 +274,13 @@ pub fn missing_prerequisites(
         .any(|c| matches!(&c.category, Category::Mise(tool) if tool == "rust"))
     {
         need(Prerequisite::Compiler, "linking Rust programs");
+    }
+    if plan
+        .mise
+        .iter()
+        .any(|c| matches!(&c.category, Category::Mise(tool) if tool == "node"))
+    {
+        need(Prerequisite::Libatomic, "running Node.js");
     }
     needed.retain(|(prerequisite, _)| !present(*prerequisite));
     needed
@@ -603,6 +612,19 @@ mod tests {
             vec![(Prerequisite::Compiler, "linking Rust programs")]
         );
         assert!(missing_prerequisites(&plan, true, |_| true).is_empty());
+    }
+
+    #[test]
+    fn node_should_need_libatomic() {
+        let mut node = mise_component();
+        node.id = "node".to_string();
+        node.category = Category::Mise("node".to_string());
+        let plan = InstallPlan::from_components(&[install(node)]);
+
+        assert_eq!(
+            missing_prerequisites(&plan, true, |_| false),
+            vec![(Prerequisite::Libatomic, "running Node.js")]
+        );
     }
 
     #[test]

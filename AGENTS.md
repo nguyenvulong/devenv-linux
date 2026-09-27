@@ -81,7 +81,7 @@ devenv-linux/
 - TUI actions are Keep, Install, and Deactivate. Space toggles Keep/Install and returns Deactivate to Keep; there is no bulk-deactivate action.
 - Deactivate is available only when `mise ls --global --json <tool>` proves global ownership. Remove every requested global version with `mise unuse --global --no-prune <tool@version>`.
 - PATH-only and locally configured tools cannot be deactivated. System packages and configurations have no removal behavior.
-- System prerequisites are implicit, never components: `InstallPlan::for_environment` adds the ones the plan needs and the machine lacks (curl + CA certificates to bootstrap mise when missing; git + a C compiler for LazyVim; a C compiler for Rust). Phase 1 installs them with the package manager together with the optional Build Tools (`base-deps`). `InstallPlan::from_components` stays pure for tests.
+- System prerequisites are implicit, never components: `InstallPlan::for_environment` adds the ones the plan needs and the machine lacks (curl + CA certificates to bootstrap mise when missing; git + a C compiler for LazyVim; a C compiler for Rust; libatomic for Node.js). Phase 1 installs them with the package manager together with the optional Build Tools (`base-deps`). `InstallPlan::from_components` stays pure for tests.
 - Without root or sudo, the review warns up front and the system phase fails with a clear message instead of crashing.
 - Mise installation is lazy. It is an implicit prerequisite only for selected mise-tool installs and Bash/Fish configuration.
 - Headless installs record and print per-component outcomes, continue independent work after failures, and exit nonzero if any component fails.
