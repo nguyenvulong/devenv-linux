@@ -34,6 +34,17 @@ impl Fixture {
             .unwrap()
     }
 }
+impl Fixture {
+    fn run_args(&self, args: &[&str]) -> std::process::Output {
+        Command::new(env!("CARGO_BIN_EXE_devenv"))
+            .args(args)
+            .env("HOME", &self.0)
+            .env("PATH", self.0.join("bin"))
+            .output()
+            .unwrap()
+    }
+}
+
 impl Drop for Fixture {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.0);
@@ -217,4 +228,73 @@ fn mise_tool_without_bash_config_still_puts_tools_on_path() {
         found.contains(".local/bin/mise") && found.contains("mise/shims/node"),
         "{found}"
     );
+}
+
+#[test]
+fn uninstall_removes_shell_setup_and_purge_removes_mise() {
+    let fixture = Fixture::new();
+    fixture.script("mise", "#!/bin/sh\nexit 0\n");
+    fs::write(fixture.0.join(".bashrc"), "# mine\n").unwrap();
+    assert!(
+        fixture
+            .run("[[components]]\nid='config-fish'\nenabled=true\n")
+            .status
+            .success()
+    );
+    assert!(
+        fs::read_to_string(fixture.0.join(".bashrc"))
+            .unwrap()
+            .contains("devenv-linux")
+    );
+
+    // Without a terminal, uninstall refuses to act unless --yes is given.
+    let refused = fixture.run_args(&["--uninstall"]);
+    assert!(!refused.status.success());
+    assert!(
+        fs::read_to_string(fixture.0.join(".bashrc"))
+            .unwrap()
+            .contains("devenv-linux")
+    );
+
+    let output = fixture.run_args(&["--uninstall", "--yes"]);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    assert_eq!(
+        fs::read_to_string(fixture.0.join(".bashrc")).unwrap(),
+        "# mine\n"
+    );
+    assert!(
+        !fixture.0.join(".profile").exists()
+            || !fs::read_to_string(fixture.0.join(".profile"))
+                .unwrap()
+                .contains("devenv-linux")
+    );
+    assert!(
+        !fixture
+            .0
+            .join(".config/fish/conf.d/devenv-mise.fish")
+            .exists()
+    );
+    assert!(!fixture.0.join(".config/fish/config.fish").exists());
+
+    // A second run finds nothing left to do.
+    let again = fixture.run_args(&["--uninstall", "--yes"]);
+    assert!(String::from_utf8_lossy(&again.stdout).contains("Nothing to uninstall"));
+
+    // --purge removes mise itself and its data.
+    for dir in [".local/bin", ".local/share/mise/installs/node"] {
+        fs::create_dir_all(fixture.0.join(dir)).unwrap();
+    }
+    fs::write(fixture.0.join(".local/bin/mise"), "bin").unwrap();
+    let purge = fixture.run_args(&["--uninstall", "--purge", "--yes"]);
+    assert!(
+        purge.status.success(),
+        "{}",
+        String::from_utf8_lossy(&purge.stdout)
+    );
+    assert!(!fixture.0.join(".local/bin/mise").exists());
+    assert!(!fixture.0.join(".local/share/mise").exists());
 }
