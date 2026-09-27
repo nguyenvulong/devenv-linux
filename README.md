@@ -13,7 +13,7 @@ to update or remove.
 ## Quick start
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/nguyenvulong/devenv-linux/main/install.sh | DEVENV_VERSION=v1.1.1 bash
+curl -fsSL https://raw.githubusercontent.com/nguyenvulong/devenv-linux/main/install.sh | DEVENV_VERSION=v1.2.0 bash
 ```
 
 Choose components with <kbd>Space</kbd>, press <kbd>Enter</kbd> to review, then
